@@ -1,4 +1,5 @@
 .env
+test.env
 __pycache__/
 *.pyc
 *.log
@@ -7,3 +8,5 @@ structure.txt
 .idea
 venv/
 data/
+start_MedPhysRobot_cmd.bat
+start_MedPhysRobot_hide.bat

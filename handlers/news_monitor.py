@@ -4,6 +4,7 @@ import sqlite3
 import hashlib
 from aiogram import Router, Bot
 from aiogram.types import Message
+from aiogram.exceptions import TelegramBadRequest
 from utils.config import SOURCE_CHANNEL_ID, TARGET_GROUP_ID, TARGET_TOPIC_ID, DB_PATH
 from utils.logger import setup_logger
 
@@ -58,12 +59,22 @@ async def forward_news(message: Message, bot: Bot):
         logger.info(f"[NEWS] Пропущено по хешу: message_id={message.message_id}")
         return
 
+    # Автоопределение: если TARGET_TOPIC_ID пустой, None или 1 → отправка в General
+    thread_id = None
+    if TARGET_TOPIC_ID and str(TARGET_TOPIC_ID).isdigit():
+        if int(TARGET_TOPIC_ID) > 1:
+            thread_id = int(TARGET_TOPIC_ID)
+
     try:
-        await message.forward(
+        await bot.copy_message(
             chat_id=TARGET_GROUP_ID,
-            message_thread_id=TARGET_TOPIC_ID
+            from_chat_id=SOURCE_CHANNEL_ID,
+            message_id=message.message_id,
+            message_thread_id=thread_id  # None → General
         )
         save_forwarded_news(message.message_id, content_hash)
-        logger.info(f"[NEWS] Переслано сообщение из канала: message_id={message.message_id}")
+        logger.info(f"[NEWS] Переслано сообщение: message_id={message.message_id}, thread_id={thread_id}")
+    except TelegramBadRequest as e:
+        logger.warning(f"[NEWS] Ошибка при пересылке: {e}")
     except Exception as e:
-        logger.warning(f"[NEWS] Ошибка при пересылке новости: {e}")
+        logger.exception(f"[NEWS] Неожиданная ошибка: {e}")

@@ -1,7 +1,5 @@
 # utils/logger.py
 
-
-# utils/logger.py
 import logging
 from logging.handlers import RotatingFileHandler
 import os

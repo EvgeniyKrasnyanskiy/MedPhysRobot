@@ -3,7 +3,7 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
+# from aiogram.types import BotCommand
 from aiogram.client.default import DefaultBotProperties
 
 from utils.config import BOT_TOKEN, DEBUG_MODE, LOG_LEVEL
@@ -13,6 +13,7 @@ from utils.db import init_db
 from handlers import start, relay, news_monitor, status, moderation
 from utils.commands import setup_bot_commands
 from handlers import help
+from middlewares.album import AlbumMiddleware
 
 logger = setup_logger("bot", level=LOG_LEVEL)
 
@@ -31,6 +32,7 @@ async def main():
 
     # Подключение всех роутеров
     dp.include_router(moderation.router)
+    dp.message.middleware(AlbumMiddleware())
     dp.include_router(start.router)
     dp.include_router(help.router)
     dp.include_router(relay.router)

@@ -5,7 +5,6 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.types import BotCommandScopeDefault, BotCommandScopeAllGroupChats
 
-
 router = Router()
 
 @router.message(Command("help"))

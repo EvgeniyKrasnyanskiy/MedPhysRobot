@@ -59,22 +59,76 @@ async def forward_news(message: Message, bot: Bot):
         logger.info(f"[NEWS] Пропущено по хешу: message_id={message.message_id}")
         return
 
-    # Автоопределение: если TARGET_TOPIC_ID пустой, None или 1 → отправка в General
+    # Определение thread_id и режима пересылки
+    use_forward = False
     thread_id = None
-    if TARGET_TOPIC_ID and str(TARGET_TOPIC_ID).isdigit():
-        if int(TARGET_TOPIC_ID) > 1:
+
+    if not TARGET_TOPIC_ID or str(TARGET_TOPIC_ID).strip() in ("", "0", "1"):
+        use_forward = True
+    else:
+        try:
             thread_id = int(TARGET_TOPIC_ID)
+            if thread_id <= 1:
+                use_forward = True
+                thread_id = None
+        except ValueError:
+            logger.warning(f"[NEWS] Некорректный TARGET_TOPIC_ID: {TARGET_TOPIC_ID}")
+            use_forward = True
+            thread_id = None
 
     try:
-        await bot.copy_message(
-            chat_id=TARGET_GROUP_ID,
-            from_chat_id=SOURCE_CHANNEL_ID,
-            message_id=message.message_id,
-            message_thread_id=thread_id  # None → General
-        )
+        if use_forward:
+            await message.forward(chat_id=TARGET_GROUP_ID)
+            logger.info(f"[NEWS] Переслано через forward(): message_id={message.message_id}")
+        else:
+            # Добавление источника
+            caption = message.caption or ""
+            if caption:
+                caption += "\n\nИсточник: @MedPhysProChannel"
+            else:
+                caption = "Источник: @MedPhysProChannel"
+
+            if message.photo:
+                await bot.send_photo(
+                    chat_id=TARGET_GROUP_ID,
+                    photo=message.photo[-1].file_id,
+                    caption=caption,
+                    message_thread_id=thread_id
+                )
+            elif message.video:
+                await bot.send_video(
+                    chat_id=TARGET_GROUP_ID,
+                    video=message.video.file_id,
+                    caption=caption,
+                    message_thread_id=thread_id
+                )
+            elif message.document:
+                await bot.send_document(
+                    chat_id=TARGET_GROUP_ID,
+                    document=message.document.file_id,
+                    caption=caption,
+                    message_thread_id=thread_id
+                )
+            elif message.text:
+                await bot.send_message(
+                    chat_id=TARGET_GROUP_ID,
+                    text=message.text + "\n\nИсточник: @MedPhysProChannel",
+                    message_thread_id=thread_id
+                )
+            else:
+                # fallback: copy_message без подписи
+                await bot.copy_message(
+                    chat_id=TARGET_GROUP_ID,
+                    from_chat_id=SOURCE_CHANNEL_ID,
+                    message_id=message.message_id,
+                    message_thread_id=thread_id
+                )
+
+            logger.info(f"[NEWS] Скопировано через copy_message(): message_id={message.message_id}, thread_id={thread_id}")
+
         save_forwarded_news(message.message_id, content_hash)
-        logger.info(f"[NEWS] Переслано сообщение: message_id={message.message_id}, thread_id={thread_id}")
     except TelegramBadRequest as e:
         logger.warning(f"[NEWS] Ошибка при пересылке: {e}")
     except Exception as e:
         logger.exception(f"[NEWS] Неожиданная ошибка: {e}")
+

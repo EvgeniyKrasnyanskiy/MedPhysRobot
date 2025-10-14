@@ -1,16 +1,17 @@
 # handlers/status.py
 
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from utils.db import get_user_status
+from utils.config import RELAY_GROUP_ID
 from datetime import datetime
 from utils.logger import setup_logger
 
 logger = setup_logger("status")
 router = Router()
 
-@router.message(Command("status"))
+@router.message(F.chat.id == RELAY_GROUP_ID, Command("/status"))
 async def cmd_status(message: Message):
     user_id = message.from_user.id
     logger.info(f"[STATUS] Запрос статуса от пользователя {user_id}")

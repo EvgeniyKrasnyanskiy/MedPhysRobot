@@ -2,11 +2,7 @@
 
 import logging
 from logging.handlers import RotatingFileHandler
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-LOG_FILE = os.getenv("LOG_FILE", "medphysbot.log")  # читаем напрямую
+from utils.paths import LOG_FILE_PATH
 
 def setup_logger(name: str = "med_phys_bot", level: str = "INFO") -> logging.Logger:
     logger = logging.getLogger(name)
@@ -20,10 +16,14 @@ def setup_logger(name: str = "med_phys_bot", level: str = "INFO") -> logging.Log
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
 
-    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=5, encoding="utf-8")
+    # 🔧 Убедимся, что папка logs/ существует
+    LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    file_handler = RotatingFileHandler(LOG_FILE_PATH, maxBytes=1_000_000, backupCount=5, encoding="utf-8")
     file_handler.setFormatter(formatter)
 
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
     return logger
+

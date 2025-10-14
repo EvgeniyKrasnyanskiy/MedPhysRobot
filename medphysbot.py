@@ -3,7 +3,6 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-# from aiogram.types import BotCommand
 from aiogram.client.default import DefaultBotProperties
 
 from utils.config import BOT_TOKEN, DEBUG_MODE, LOG_LEVEL
@@ -14,6 +13,8 @@ from handlers import start, relay, news_monitor, status, moderation
 from utils.commands import setup_bot_commands
 from handlers import help
 from middlewares.album import AlbumMiddleware
+from handlers import thanks
+
 
 logger = setup_logger("bot", level=LOG_LEVEL)
 
@@ -38,6 +39,7 @@ async def main():
     dp.include_router(relay.router)
     dp.include_router(news_monitor.router)
     dp.include_router(status.router)
+    dp.include_router(thanks.router)
 
     logger.info("Бот готов к работе")
     logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")

@@ -1,10 +1,12 @@
 # utils/commands.py
 
 from aiogram import Bot
+from utils.config import RELAY_GROUP_ID, TARGET_GROUP_ID
 from aiogram.types import (
     BotCommand,
+    BotCommandScopeChat,
     # BotCommandScopeDefault,
-    BotCommandScopeAllGroupChats,
+    # BotCommandScopeAllGroupChats,
     BotCommandScopeAllPrivateChats
 )
 
@@ -13,10 +15,15 @@ async def setup_bot_commands(bot: Bot):
     await bot.set_my_commands(
         commands=[
             BotCommand(command="start", description="Запустить бота"),
-            # BotCommand(command="status", description="Проверить ограничения"),
-            # BotCommand(command="help", description="Справка по командам"),
         ],
         scope=BotCommandScopeAllPrivateChats()
+    )
+
+    await bot.set_my_commands(
+        commands=[
+            BotCommand(command="top10", description="Показать ТОП-10 по благодарностям"),
+        ],
+        scope=BotCommandScopeChat(chat_id=TARGET_GROUP_ID)
     )
 
     # Команды для всех групп (админы)
@@ -30,6 +37,6 @@ async def setup_bot_commands(bot: Bot):
             BotCommand(command="unmute", description="Снять мут"),
             BotCommand(command="help", description="Справка по командам"),
         ],
-        scope=BotCommandScopeAllGroupChats()
+        scope=BotCommandScopeChat(chat_id=RELAY_GROUP_ID)
     )
 

@@ -1,5 +1,5 @@
 # utils/config.py
-
+import logging
 import os
 from dotenv import load_dotenv
 from utils.logger import setup_logger
@@ -22,7 +22,14 @@ DEBUG_MODE = get_env_var("DEBUG_MODE", lambda x: x.lower() == "true", required=F
 LOG_LEVEL = get_env_var("LOG_LEVEL", str, required=False, default="INFO")
 
 # Настройка логгера с уровнем из .env
-logger = setup_logger("config", level=LOG_LEVEL)
+logger = setup_logger(
+    level=LOG_LEVEL,
+    bot=None,
+    enable_telegram_logging=False,
+    log_channel_id=-1
+)
+logger = logging.getLogger("config")
+
 
 # Основные переменные
 BOT_TOKEN = get_env_var("BOT_TOKEN")
@@ -32,6 +39,8 @@ RELAY_GROUP_ID = get_env_var("RELAY_GROUP_ID", int)
 TARGET_TOPIC_ID = get_env_var("TARGET_TOPIC_ID", int)
 
 LOG_FILE = os.getenv("LOG_FILE", "medphysbot.log")  # fallback на medphysbot.log
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1"))
+ENABLE_TELEGRAM_LOGGING = os.getenv("ENABLE_TELEGRAM_LOGGING", "False").lower() == "true"
 
 # Путь к базе данных
 DB_PATH = get_env_var("DB_PATH", str, required=False, default=os.path.join("data", "relay.db"))

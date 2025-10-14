@@ -1,12 +1,12 @@
 # medphysbot.py
 
 import asyncio
+import logging
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
-from utils.config import BOT_TOKEN, DEBUG_MODE, LOG_LEVEL
-from utils.logger import setup_logger
 from utils.db import init_db
 
 from handlers import start, relay, news_monitor, status, moderation
@@ -15,23 +15,42 @@ from handlers import help
 from middlewares.album import AlbumMiddleware
 from handlers import thanks
 
+from utils.logger import setup_logger
+from utils.config import BOT_TOKEN, DEBUG_MODE, LOG_LEVEL, ENABLE_TELEGRAM_LOGGING, LOG_CHANNEL_ID
 
-logger = setup_logger("bot", level=LOG_LEVEL)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+
+# Инициализация root-логгера
+setup_logger(
+    level=LOG_LEVEL,
+    bot=bot,
+    enable_telegram_logging=ENABLE_TELEGRAM_LOGGING,
+    log_channel_id=LOG_CHANNEL_ID
+)
+
+logger = logging.getLogger("bot")  # можно использовать именованный логгер
 
 async def main():
-    # Инициализация базы данных
     try:
         init_db()
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
         return
 
-    # Создание бота и диспетчера
-    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+    # Запускаем автофлеш Telegram-хендлера (внутри активного event loop)
+    def get_all_handlers(logger):
+        handlers = list(logger.handlers)
+        if logger.propagate and logger.parent:
+            handlers += get_all_handlers(logger.parent)
+        return handlers
+
+    for handler in get_all_handlers(logging.getLogger("bot")):
+        if hasattr(handler, "start"):
+            handler.start()
+
     await setup_bot_commands(bot)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Подключение всех роутеров
     dp.include_router(moderation.router)
     dp.message.middleware(AlbumMiddleware())
     dp.include_router(start.router)
@@ -40,6 +59,11 @@ async def main():
     dp.include_router(news_monitor.router)
     dp.include_router(status.router)
     dp.include_router(thanks.router)
+
+    # Принудительная отправка буфера перед polling
+    for handler in logger.handlers:
+        if hasattr(handler, "_flush"):
+            await handler._flush()
 
     logger.info("Бот готов к работе")
     logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")

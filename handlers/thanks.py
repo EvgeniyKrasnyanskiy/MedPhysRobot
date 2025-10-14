@@ -1,5 +1,7 @@
 # handlers/thanks.py
 
+import asyncio
+
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -42,10 +44,23 @@ async def detect_thanks(message: Message):
 async def show_top_thanked(message: Message):
     top = get_top_thanked(limit=10)
     if not top:
-        await message.answer("Пока никто не получил благодарностей.")
-        return
+        reply = await message.answer("Пока никто не получил благодарностей.")
+    else:
+        lines = [f"🏆 ТОП-10 по благодарностям:"]
+        for i, (name, count) in enumerate(top, 1):
+            lines.append(f"{i}. {name} — {count}")
+        reply = await message.answer("\n".join(lines))
 
-    lines = [f"🏆 ТОП-10 по благодарностям:"]
-    for i, (name, count) in enumerate(top, 1):
-        lines.append(f"{i}. {name} — {count}")
-    await message.answer("\n".join(lines))
+    # ⏳ Удаление команды через 3 секунды
+    await asyncio.sleep(3)
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    # ⏳ Удаление ответа через 60 секунд
+    await asyncio.sleep(57)  # уже прошло 3 секунды
+    try:
+        await reply.delete()
+    except Exception:
+        pass

@@ -5,7 +5,7 @@ import hashlib
 from aiogram import Router, Bot
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest
-from utils.config import SOURCE_CHANNEL_ID, TARGET_GROUP_ID, TARGET_TOPIC_ID, DB_PATH
+from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, MEDPHYSPRO_GROUP_TOPIC_ID, DB_PATH
 from utils.logger import setup_logger
 
 router = Router()
@@ -50,7 +50,7 @@ init_forwarded_news_table()
 
 @router.channel_post()
 async def forward_news(message: Message, bot: Bot):
-    if message.chat.id != SOURCE_CHANNEL_ID:
+    if message.chat.id != MEDPHYSPRO_CHANNEL_ID:
         return
 
     content_hash = hash_message_content(message)
@@ -63,22 +63,22 @@ async def forward_news(message: Message, bot: Bot):
     use_forward = False
     thread_id = None
 
-    if not TARGET_TOPIC_ID or str(TARGET_TOPIC_ID).strip() in ("", "0", "1"):
+    if not MEDPHYSPRO_GROUP_TOPIC_ID or str(MEDPHYSPRO_GROUP_TOPIC_ID).strip() in ("", "0", "1"):
         use_forward = True
     else:
         try:
-            thread_id = int(TARGET_TOPIC_ID)
+            thread_id = int(MEDPHYSPRO_GROUP_TOPIC_ID)
             if thread_id <= 1:
                 use_forward = True
                 thread_id = None
         except ValueError:
-            logger.warning(f"[NEWS] Некорректный TARGET_TOPIC_ID: {TARGET_TOPIC_ID}")
+            logger.warning(f"[NEWS] Некорректный MEDPHYSPRO_GROUP_TOPIC_ID: {MEDPHYSPRO_GROUP_TOPIC_ID}")
             use_forward = True
             thread_id = None
 
     try:
         if use_forward:
-            await message.forward(chat_id=TARGET_GROUP_ID)
+            await message.forward(chat_id=MEDPHYSPRO_GROUP_ID)
             logger.info(f"[NEWS] Переслано через forward(): message_id={message.message_id}")
         else:
             # Добавление источника
@@ -90,36 +90,36 @@ async def forward_news(message: Message, bot: Bot):
 
             if message.photo:
                 await bot.send_photo(
-                    chat_id=TARGET_GROUP_ID,
+                    chat_id=MEDPHYSPRO_GROUP_ID,
                     photo=message.photo[-1].file_id,
                     caption=caption,
                     message_thread_id=thread_id
                 )
             elif message.video:
                 await bot.send_video(
-                    chat_id=TARGET_GROUP_ID,
+                    chat_id=MEDPHYSPRO_GROUP_ID,
                     video=message.video.file_id,
                     caption=caption,
                     message_thread_id=thread_id
                 )
             elif message.document:
                 await bot.send_document(
-                    chat_id=TARGET_GROUP_ID,
+                    chat_id=MEDPHYSPRO_GROUP_ID,
                     document=message.document.file_id,
                     caption=caption,
                     message_thread_id=thread_id
                 )
             elif message.text:
                 await bot.send_message(
-                    chat_id=TARGET_GROUP_ID,
+                    chat_id=MEDPHYSPRO_GROUP_ID,
                     text=message.text + "\n\nИсточник: @MedPhysProChannel",
                     message_thread_id=thread_id
                 )
             else:
                 # fallback: copy_message без подписи
                 await bot.copy_message(
-                    chat_id=TARGET_GROUP_ID,
-                    from_chat_id=SOURCE_CHANNEL_ID,
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    from_chat_id=MEDPHYSPRO_CHANNEL_ID,
                     message_id=message.message_id,
                     message_thread_id=thread_id
                 )

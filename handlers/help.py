@@ -4,11 +4,11 @@ from aiogram import Router, Bot, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.types import BotCommandScopeDefault, BotCommandScopeAllGroupChats
-from utils.config import RELAY_GROUP_ID
+from utils.config import ADMIN_GROUP_ID
 
 router = Router()
 
-@router.message(F.chat.id == RELAY_GROUP_ID, Command("help", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == ADMIN_GROUP_ID, Command("help", ignore_mention=True, ignore_case=True))
 async def help_command(message: Message, bot: Bot):
     scope = (
         BotCommandScopeAllGroupChats()

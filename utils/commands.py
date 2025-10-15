@@ -1,7 +1,7 @@
 # utils/commands.py
 
 from aiogram import Bot
-from utils.config import RELAY_GROUP_ID, TARGET_GROUP_ID
+from utils.config import ADMIN_GROUP_ID, MEDPHYSPRO_GROUP_ID
 from aiogram.types import (
     BotCommand,
     BotCommandScopeChat,
@@ -23,7 +23,7 @@ async def setup_bot_commands(bot: Bot):
         commands=[
             BotCommand(command="top10", description="Показать ТОП-10 по благодарностям"),
         ],
-        scope=BotCommandScopeChat(chat_id=TARGET_GROUP_ID)
+        scope=BotCommandScopeChat(chat_id=MEDPHYSPRO_GROUP_ID)
     )
 
     # Команды для всех групп (админы)
@@ -37,6 +37,6 @@ async def setup_bot_commands(bot: Bot):
             BotCommand(command="unmute", description="Снять мут"),
             BotCommand(command="help", description="Справка по командам"),
         ],
-        scope=BotCommandScopeChat(chat_id=RELAY_GROUP_ID)
+        scope=BotCommandScopeChat(chat_id=ADMIN_GROUP_ID)
     )
 

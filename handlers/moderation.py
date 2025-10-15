@@ -11,7 +11,7 @@ from utils.db import (
     get_user_by_forwarded,
     get_user_status
 )
-from utils.config import RELAY_GROUP_ID
+from utils.config import ADMIN_GROUP_ID
 from utils.logger import setup_logger
 from datetime import datetime, timedelta
 import asyncio
@@ -45,10 +45,10 @@ async def reply_required(message: Message, command: str):
 
 
 # 🔇 /mute
-@router.message(F.chat.id == RELAY_GROUP_ID, Command("mute", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == ADMIN_GROUP_ID, Command("mute", ignore_mention=True, ignore_case=True))
 async def cmd_mute(message: Message, bot: Bot):
     logger.info(f"[MOD] cmd_mute вызван: text={message.text}, chat_id={message.chat.id}")
-    if message.chat.id != RELAY_GROUP_ID:
+    if message.chat.id != ADMIN_GROUP_ID:
         return
 
     if not message.reply_to_message:
@@ -74,10 +74,10 @@ async def cmd_mute(message: Message, bot: Bot):
 
 
 # 🔊 /unmute
-@router.message(F.chat.id == RELAY_GROUP_ID, Command("unmute", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == ADMIN_GROUP_ID, Command("unmute", ignore_mention=True, ignore_case=True))
 async def cmd_unmute(message: Message, bot: Bot):
     logger.info(f"[MOD] cmd_unmute вызван: text={message.text}, chat_id={message.chat.id}")
-    if message.chat.id != RELAY_GROUP_ID:
+    if message.chat.id != ADMIN_GROUP_ID:
         return
 
     if not message.reply_to_message:
@@ -101,10 +101,10 @@ async def cmd_unmute(message: Message, bot: Bot):
 
 
 # 🚫 /ban
-@router.message(F.chat.id == RELAY_GROUP_ID, Command("ban", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == ADMIN_GROUP_ID, Command("ban", ignore_mention=True, ignore_case=True))
 async def cmd_ban(message: Message, bot: Bot):
     logger.info(f"[MOD] cmd_ban вызван: text={message.text}, chat_id={message.chat.id}")
-    if message.chat.id != RELAY_GROUP_ID:
+    if message.chat.id != ADMIN_GROUP_ID:
         return
 
     if not message.reply_to_message:
@@ -130,10 +130,10 @@ async def cmd_ban(message: Message, bot: Bot):
 
 
 # ✅ /unban
-@router.message(F.chat.id == RELAY_GROUP_ID, Command("unban", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == ADMIN_GROUP_ID, Command("unban", ignore_mention=True, ignore_case=True))
 async def cmd_unban(message: Message, bot: Bot):
     logger.info(f"[MOD] cmd_unban вызван: text={message.text}, chat_id={message.chat.id}")
-    if message.chat.id != RELAY_GROUP_ID:
+    if message.chat.id != ADMIN_GROUP_ID:
         return
 
     if not message.reply_to_message:
@@ -157,7 +157,7 @@ async def cmd_unban(message: Message, bot: Bot):
 
 
 # ❓ /status
-@router.message(F.chat.id == RELAY_GROUP_ID, Command("status", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == ADMIN_GROUP_ID, Command("status", ignore_mention=True, ignore_case=True))
 async def cmd_status(message: Message):
     user_id = extract_user_id_from_reply(message)
     if not user_id:

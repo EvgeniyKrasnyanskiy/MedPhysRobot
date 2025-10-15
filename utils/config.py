@@ -33,10 +33,10 @@ logger = logging.getLogger("config")
 
 # Основные переменные
 BOT_TOKEN = get_env_var("BOT_TOKEN")
-SOURCE_CHANNEL_ID = get_env_var("SOURCE_CHANNEL_ID", int)
-TARGET_GROUP_ID = get_env_var("TARGET_GROUP_ID", int)
-RELAY_GROUP_ID = get_env_var("RELAY_GROUP_ID", int)
-TARGET_TOPIC_ID = get_env_var("TARGET_TOPIC_ID", int)
+MEDPHYSPRO_CHANNEL_ID = get_env_var("MEDPHYSPRO_CHANNEL_ID", int)
+MEDPHYSPRO_GROUP_ID = get_env_var("MEDPHYSPRO_GROUP_ID", int)
+ADMIN_GROUP_ID = get_env_var("ADMIN_GROUP_ID", int)
+MEDPHYSPRO_GROUP_TOPIC_ID = get_env_var("MEDPHYSPRO_GROUP_TOPIC_ID", int)
 
 LOG_FILE = os.getenv("LOG_FILE", "medphysbot.log")  # fallback на medphysbot.log
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1"))

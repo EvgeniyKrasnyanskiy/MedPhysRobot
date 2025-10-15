@@ -5,7 +5,7 @@ import asyncio
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message
-from utils.config import TARGET_GROUP_ID
+from utils.config import MEDPHYSPRO_GROUP_ID
 from utils.thanks_db import increment_thanks, get_top_thanked
 from utils.thanks_words import load_thanks_words
 from utils.logger import setup_logger
@@ -17,7 +17,7 @@ logger = setup_logger("thanks")
 THANKS_WORDS = load_thanks_words()
 EMOJI_TRIGGERS = {"🙏", "🤝", "❤️", "💐"}
 
-@router.message(F.chat.id == TARGET_GROUP_ID, F.reply_to_message)
+@router.message(F.chat.id == MEDPHYSPRO_GROUP_ID, F.reply_to_message)
 async def detect_thanks(message: Message):
     text = (message.text or "").lower()
 
@@ -40,7 +40,7 @@ async def detect_thanks(message: Message):
             logger.info(f"[THANKS] +1 для {target_user.full_name} ({target_user.id})")
             return
 
-@router.message(F.chat.id == TARGET_GROUP_ID, Command("top10", ignore_mention=True, ignore_case=True))
+@router.message(F.chat.id == MEDPHYSPRO_GROUP_ID, Command("top10", ignore_mention=True, ignore_case=True))
 async def show_top_thanked(message: Message):
     top = get_top_thanked(limit=10)
     if not top:

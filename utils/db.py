@@ -2,7 +2,7 @@
 
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.logger import setup_logger
 from utils.config import DB_PATH
 
@@ -45,6 +45,16 @@ def init_db():
             message_id INTEGER PRIMARY KEY,
             content_hash TEXT NOT NULL,
             forwarded_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Таблица ответов админов
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reply_map (
+            admin_msg_id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            user_msg_id INTEGER NOT NULL,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -160,6 +170,40 @@ def is_muted(user_id: int) -> bool:
             return False
     return False
 
+def get_admin_msg_id(user_id: int, user_msg_id: int) -> int | None:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT forwarded_id FROM relay_map
+        WHERE original_user_id = ? AND original_message_id = ?
+    """, (user_id, user_msg_id))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+def save_reply_mapping(admin_msg_id: int, user_id: int, user_msg_id: int):
+    logger = setup_logger("db")  # ← добавляем логгер
+    logger.info(f"[DB] save_reply_mapping: admin_msg_id={admin_msg_id}, user_id={user_id}, user_msg_id={user_msg_id}")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR REPLACE INTO reply_map (admin_msg_id, user_id, user_msg_id)
+        VALUES (?, ?, ?)
+    """, (admin_msg_id, user_id, user_msg_id))
+    conn.commit()
+    conn.close()
+
+def get_user_reply_msg(admin_msg_id: int) -> tuple[int, int] | None:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT user_id, user_msg_id FROM reply_map WHERE admin_msg_id = ?
+    """, (admin_msg_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result if result else None
+
 def get_user_status(user_id: int) -> dict:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -188,3 +232,16 @@ def get_user_status(user_id: int) -> dict:
                 status["muted"] = False
 
     return status
+
+def cleanup_old_mappings(days: int = 2):
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM relay_map WHERE timestamp < ?", (cutoff,))
+    cursor.execute("DELETE FROM reply_map WHERE timestamp < ?", (cutoff,))
+    conn.commit()
+    conn.close()
+
+    logger = setup_logger("db")
+    logger.info(f"[DB] Очистка старых связей: удалено всё старше {cutoff}")

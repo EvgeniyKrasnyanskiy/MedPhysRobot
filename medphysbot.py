@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
-from utils.db import init_db
+from utils.db import init_db, cleanup_old_mappings
 
 from handlers import start, relay, news_monitor, status, moderation
 from utils.commands import setup_bot_commands
@@ -33,9 +33,22 @@ logger = logging.getLogger("bot")  # можно использовать име�
 async def main():
     try:
         init_db()
+        cleanup_old_mappings(days=2)
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
         return
+
+    # Фоновая задача: автоочистка каждые 24 часа
+    async def periodic_cleanup():
+        while True:
+            try:
+                cleanup_old_mappings(days=2)
+                logger.info("[DB] Автоочистка завершена")
+            except Exception as e:
+                logger.error(f"[DB] Ошибка автоочистки: {e}")
+            await asyncio.sleep(86400)  # 24 часа
+
+    asyncio.create_task(periodic_cleanup())
 
     # Запускаем автофлеш Telegram-хендлера (внутри активного event loop)
     def get_all_handlers(logger):
@@ -71,3 +84,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

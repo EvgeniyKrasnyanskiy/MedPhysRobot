@@ -4,7 +4,8 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, User
 from typing import List
 from utils.config import ADMIN_GROUP_ID
-from utils.db import save_mapping, get_user_by_forwarded, is_banned, is_muted
+from utils.db import save_mapping, get_user_by_forwarded, is_banned, is_muted, get_admin_msg_id, get_user_reply_msg, \
+    save_reply_mapping
 from utils.logger import setup_logger
 
 router = Router()
@@ -151,17 +152,118 @@ async def handle_group_reply(message: Message, bot: Bot, album: List[Message] = 
             media = []
             for msg in album:
                 if msg.photo:
-                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=msg.caption or "", parse_mode="HTML"))
+                    media.append(
+                        InputMediaPhoto(media=msg.photo[-1].file_id, caption=msg.caption or "", parse_mode="HTML"))
                 elif msg.video:
                     media.append(InputMediaVideo(media=msg.video.file_id, caption=msg.caption or "", parse_mode="HTML"))
-            await bot.send_media_group(chat_id=user_id, media=media)
+            sent = await bot.send_media_group(chat_id=user_id, media=media)
+            save_reply_mapping(admin_msg_id=message.message_id, user_id=user_id, user_msg_id=sent[0].message_id)
             logger.info(f"[RELAY] Ответ-альбом отправлен пользователю {user_id}")
+
         else:
-            await bot.copy_message(
+            sent = await bot.send_message(
                 chat_id=user_id,
-                from_chat_id=message.chat.id,
-                message_id=message.message_id
+                text=message.text,
+                parse_mode="HTML"
             )
+            save_reply_mapping(admin_msg_id=message.message_id, user_id=user_id, user_msg_id=sent.message_id)
+
             logger.info(f"[RELAY] Ответ отправлен пользователю {user_id}")
     except Exception as e:
         logger.error(f"[RELAY] Ошибка пересылки ответа: {e}")
+
+@router.edited_message(F.chat.type == "private")
+async def handle_edited_private_message(message: Message, bot: Bot):
+    admin_msg_id = get_admin_msg_id(message.from_user.id, message.message_id)
+    if not admin_msg_id:
+        logger.warning(f"[RELAY] Нет admin_msg_id для user_id={message.from_user.id}, msg_id={message.message_id}")
+        return
+
+    try:
+        if message.caption and (message.photo or message.video or message.document):
+            await bot.edit_message_caption(
+                chat_id=ADMIN_GROUP_ID,
+                message_id=admin_msg_id,
+                caption=f"(отредактировано)\n{message.caption}",
+                parse_mode="HTML"
+            )
+        elif message.text:
+            await bot.edit_message_text(
+                chat_id=ADMIN_GROUP_ID,
+                message_id=admin_msg_id,
+                text=f"(отредактировано)\n{message.text}",
+                parse_mode="HTML"
+            )
+        logger.info(f"[RELAY] Обновлено сообщение от {message.from_user.id}")
+    except Exception as e:
+        logger.error(f"[RELAY] Ошибка при обновлении сообщения: {e}")
+
+@router.edited_message(F.chat.id == ADMIN_GROUP_ID)
+async def handle_admin_edit(message: Message, bot: Bot):
+    result = get_user_reply_msg(message.message_id)
+    if not result:
+        logger.warning(f"[RELAY] Не найдено соответствие для admin_msg_id={message.message_id}")
+        return
+
+    user_id, user_msg_id = result
+    try:
+        if message.caption and (message.photo or message.video or message.document):
+            await bot.edit_message_caption(
+                chat_id=user_id,
+                message_id=user_msg_id,
+                caption=f"(отредактировано)\n{message.caption}",
+                parse_mode="HTML"
+            )
+        elif message.text:
+            await bot.edit_message_text(
+                chat_id=user_id,
+                message_id=user_msg_id,
+                text=f"(отредактировано)\n{message.text}",
+                parse_mode="HTML"
+            )
+        logger.info(f"[RELAY] Редактированный ответ обновлён для пользователя {user_id}")
+    except Exception as e:
+        logger.error(f"[RELAY] Ошибка редактирования ответа: {e}")
+
+@router.edited_message(F.chat.type == "private")
+async def handle_edited_album_caption(message: Message, bot: Bot):
+    if not message.caption:
+        return  # не редактировали caption — пропускаем
+
+    admin_msg_id = get_admin_msg_id(message.from_user.id, message.message_id)
+    if not admin_msg_id:
+        logger.warning(f"[RELAY] Нет admin_msg_id для альбома user_id={message.from_user.id}, msg_id={message.message_id}")
+        return
+
+    try:
+        await bot.edit_message_caption(
+            chat_id=ADMIN_GROUP_ID,
+            message_id=admin_msg_id,
+            caption=f"(отредактировано)\n{message.caption}",
+            parse_mode="HTML"
+        )
+        logger.info(f"[RELAY] Обновлён caption альбома от {message.from_user.id}")
+    except Exception as e:
+        logger.error(f"[RELAY] Ошибка редактирования caption альбома: {e}")
+
+@router.edited_message(F.chat.id == ADMIN_GROUP_ID)
+async def handle_admin_album_edit(message: Message, bot: Bot):
+    if not message.caption:
+        return
+
+    result = get_user_reply_msg(message.message_id)
+    if not result:
+        logger.warning(f"[RELAY] Нет соответствия для admin_msg_id={message.message_id}")
+        return
+
+    user_id, user_msg_id = result
+    try:
+        await bot.edit_message_caption(
+            chat_id=user_id,
+            message_id=user_msg_id,
+            caption=f"(отредактировано)\n{message.caption}",
+            parse_mode="HTML"
+        )
+        logger.info(f"[RELAY] Обновлён caption альбома для пользователя {user_id}")
+    except Exception as e:
+        logger.error(f"[RELAY] Ошибка редактирования caption альбома: {e}")

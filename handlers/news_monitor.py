@@ -2,14 +2,29 @@
 
 import sqlite3
 import hashlib
+from datetime import timedelta, datetime
+
 from aiogram import Router, Bot
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest
-from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, MEDPHYSPRO_GROUP_TOPIC_ID, DB_PATH
+from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, MEDPHYSPRO_GROUP_TOPIC_ID, DB_PATH, \
+    MEDPHYSPRO_CHANNEL_USERNAME
 from utils.logger import setup_logger
 
 router = Router()
 logger = setup_logger("news_monitor")
+
+def resolve_thread_id(raw_id: str | None) -> int | None:
+    try:
+        if not raw_id or str(raw_id).strip() in ("", "0", "1"):
+            return None
+        thread_id = int(raw_id)
+        if thread_id <= 1:
+            return None
+        return thread_id
+    except ValueError:
+        logger.warning(f"[NEWS] Некорректный MEDPHYSPRO_GROUP_TOPIC_ID: {raw_id}")
+        return None
 
 def init_forwarded_news_table():
     conn = sqlite3.connect(DB_PATH)
@@ -18,6 +33,7 @@ def init_forwarded_news_table():
         CREATE TABLE IF NOT EXISTS forwarded_news (
             message_id INTEGER PRIMARY KEY,
             content_hash TEXT NOT NULL,
+            group_msg_id INTEGER,
             forwarded_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -36,15 +52,26 @@ def is_hash_already_forwarded(content_hash: str) -> bool:
     conn.close()
     return result is not None
 
-def save_forwarded_news(message_id: int, content_hash: str):
+def save_forwarded_news(message_id: int, content_hash: str, group_msg_id: int = None):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT OR IGNORE INTO forwarded_news (message_id, content_hash)
-        VALUES (?, ?)
-    """, (message_id, content_hash))
+        INSERT OR REPLACE INTO forwarded_news (message_id, content_hash, group_msg_id)
+        VALUES (?, ?, ?)
+    """, (message_id, content_hash, group_msg_id))
     conn.commit()
     conn.close()
+
+def get_group_msg_id(message_id: int) -> int | None:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT group_msg_id FROM forwarded_news WHERE message_id = ?", (message_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+def contains_deleted_marker(text: str | None) -> bool:
+    return text and "deleted" in text.lower()
 
 init_forwarded_news_table()
 
@@ -59,76 +86,104 @@ async def forward_news(message: Message, bot: Bot):
         logger.info(f"[NEWS] Пропущено по хешу: message_id={message.message_id}")
         return
 
-    # Определение thread_id и режима пересылки
-    use_forward = False
-    thread_id = None
-
-    if not MEDPHYSPRO_GROUP_TOPIC_ID or str(MEDPHYSPRO_GROUP_TOPIC_ID).strip() in ("", "0", "1"):
-        use_forward = True
-    else:
-        try:
-            thread_id = int(MEDPHYSPRO_GROUP_TOPIC_ID)
-            if thread_id <= 1:
-                use_forward = True
-                thread_id = None
-        except ValueError:
-            logger.warning(f"[NEWS] Некорректный MEDPHYSPRO_GROUP_TOPIC_ID: {MEDPHYSPRO_GROUP_TOPIC_ID}")
-            use_forward = True
-            thread_id = None
+    thread_id = resolve_thread_id(MEDPHYSPRO_GROUP_TOPIC_ID)
+    suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
 
     try:
-        if use_forward:
-            await message.forward(chat_id=MEDPHYSPRO_GROUP_ID)
-            logger.info(f"[NEWS] Переслано через forward(): message_id={message.message_id}")
+        sent = None
+
+        if message.photo:
+            sent = await bot.send_photo(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                photo=message.photo[-1].file_id,
+                caption=(message.caption or "") + suffix,
+                message_thread_id=thread_id
+            )
+        elif message.video:
+            sent = await bot.send_video(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                video=message.video.file_id,
+                caption=(message.caption or "") + suffix,
+                message_thread_id=thread_id
+            )
+        elif message.document:
+            sent = await bot.send_document(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                document=message.document.file_id,
+                caption=(message.caption or "") + suffix,
+                message_thread_id=thread_id
+            )
+        elif message.text:
+            sent = await bot.send_message(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                text=message.text + suffix,
+                message_thread_id=thread_id
+            )
         else:
-            # Добавление источника
-            caption = message.caption or ""
-            if caption:
-                caption += "\n\nИсточник: @MedPhysProChannel"
-            else:
-                caption = "Источник: @MedPhysProChannel"
+            logger.warning(f"[NEWS] Неизвестный тип сообщения: message_id={message.message_id}")
+            return
 
-            if message.photo:
-                await bot.send_photo(
-                    chat_id=MEDPHYSPRO_GROUP_ID,
-                    photo=message.photo[-1].file_id,
-                    caption=caption,
-                    message_thread_id=thread_id
-                )
-            elif message.video:
-                await bot.send_video(
-                    chat_id=MEDPHYSPRO_GROUP_ID,
-                    video=message.video.file_id,
-                    caption=caption,
-                    message_thread_id=thread_id
-                )
-            elif message.document:
-                await bot.send_document(
-                    chat_id=MEDPHYSPRO_GROUP_ID,
-                    document=message.document.file_id,
-                    caption=caption,
-                    message_thread_id=thread_id
-                )
-            elif message.text:
-                await bot.send_message(
-                    chat_id=MEDPHYSPRO_GROUP_ID,
-                    text=message.text + "\n\nИсточник: @MedPhysProChannel",
-                    message_thread_id=thread_id
-                )
-            else:
-                # fallback: copy_message без подписи
-                await bot.copy_message(
-                    chat_id=MEDPHYSPRO_GROUP_ID,
-                    from_chat_id=MEDPHYSPRO_CHANNEL_ID,
-                    message_id=message.message_id,
-                    message_thread_id=thread_id
-                )
-
-            logger.info(f"[NEWS] Скопировано через copy_message(): message_id={message.message_id}, thread_id={thread_id}")
-
-        save_forwarded_news(message.message_id, content_hash)
-    except TelegramBadRequest as e:
-        logger.warning(f"[NEWS] Ошибка при пересылке: {e}")
+        save_forwarded_news(message.message_id, content_hash, group_msg_id=sent.message_id)
+        logger.info(f"[NEWS] Отправлено: message_id={message.message_id}, group_msg_id={sent.message_id}")
     except Exception as e:
-        logger.exception(f"[NEWS] Неожиданная ошибка: {e}")
+        logger.exception(f"[NEWS] Ошибка при отправке: {e}")
+
+@router.edited_channel_post()
+async def handle_edited_news(message: Message, bot: Bot):
+    group_msg_id = get_group_msg_id(message.message_id)
+    if not group_msg_id:
+        logger.info(f"[NEWS] Нет group_msg_id для message_id={message.message_id}")
+        return
+
+    # Удаление по пустому содержимому или маркеру "deleted"
+    if (
+        not message.text and not message.caption
+    ) or (
+        contains_deleted_marker(message.text) or contains_deleted_marker(message.caption)
+    ):
+        try:
+            await bot.delete_message(chat_id=MEDPHYSPRO_GROUP_ID, message_id=group_msg_id)
+            logger.info(f"[NEWS] Удалено сообщение в группе: message_id={group_msg_id} (маркер или пустое)")
+        except Exception as e:
+            logger.error(f"[NEWS] Ошибка при удалении: {e}")
+        return
+
+    suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
+
+    try:
+        if message.text:
+            await bot.edit_message_text(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                message_id=group_msg_id,
+                text=message.text + suffix
+            )
+        elif message.caption:
+            await bot.edit_message_caption(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                message_id=group_msg_id,
+                caption=message.caption + suffix
+            )
+        else:
+            logger.warning(f"[NEWS] Не удалось отредактировать: message_id={message.message_id} — нет текста или caption")
+            return
+
+        logger.info(f"[NEWS] Обновлено сообщение: message_id={message.message_id}")
+    except TelegramBadRequest as e:
+        logger.warning(f"[NEWS] Ошибка Telegram при редактировании: {e}")
+    except Exception as e:
+        logger.exception(f"[NEWS] Неожиданная ошибка при редактировании: {e}")
+
+def cleanup_forwarded_news(days: int = 2):
+    threshold = datetime.utcnow() - timedelta(days=days)
+    iso_threshold = threshold.isoformat()
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM forwarded_news WHERE forwarded_at < ?", (iso_threshold,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    logger.info(f"[DB] Очистка forwarded_news: удалено {deleted} записей старше {iso_threshold}")
+
 

@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
+from handlers.news_monitor import cleanup_forwarded_news
 from utils.db import init_db, cleanup_old_mappings
 
 from handlers import start, relay, news_monitor, status, moderation
@@ -34,6 +35,7 @@ async def main():
     try:
         init_db()
         cleanup_old_mappings(days=2)
+        cleanup_forwarded_news(days=2)
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
         return
@@ -43,6 +45,7 @@ async def main():
         while True:
             try:
                 cleanup_old_mappings(days=2)
+                cleanup_forwarded_news(days=2)
                 logger.info("[DB] Автоочистка завершена")
             except Exception as e:
                 logger.error(f"[DB] Ошибка автоочистки: {e}")

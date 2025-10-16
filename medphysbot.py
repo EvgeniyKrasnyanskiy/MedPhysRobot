@@ -35,7 +35,7 @@ async def main():
     try:
         init_db()
         cleanup_old_mappings(days=2)
-        cleanup_forwarded_news(days=2)
+        cleanup_forwarded_news(days=7)
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
         return

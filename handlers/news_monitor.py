@@ -173,7 +173,7 @@ async def handle_edited_news(message: Message, bot: Bot):
     except Exception as e:
         logger.exception(f"[NEWS] Неожиданная ошибка при редактировании: {e}")
 
-def cleanup_forwarded_news(days: int = 2):
+def cleanup_forwarded_news(days: int = 7):
     threshold = datetime.utcnow() - timedelta(days=days)
     iso_threshold = threshold.isoformat()
 

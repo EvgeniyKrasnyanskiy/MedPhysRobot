@@ -8,11 +8,12 @@ from aiogram.types import Message
 from utils.config import MEDPHYSPRO_GROUP_ID
 from utils.thanks_db import increment_thanks, get_top_thanked
 from utils.thanks_words import load_thanks_words
-from utils.logger import setup_logger
+from utils.logger import get_logger
 import re
 
 router = Router()
-logger = setup_logger("thanks")
+logger = get_logger("thanks")
+logger.info("[THANKS] thanks.py загружен")
 
 THANKS_WORDS = load_thanks_words()
 EMOJI_TRIGGERS = {"🙏", "🤝", "❤️", "💐"}

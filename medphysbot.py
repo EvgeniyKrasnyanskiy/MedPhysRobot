@@ -23,19 +23,21 @@ bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 
 # Инициализация root-логгера
 setup_logger(
+    name="bot",
     level=LOG_LEVEL,
     bot=bot,
-    enable_telegram_logging=ENABLE_TELEGRAM_LOGGING,
+    enable_telegram_logging=True,
     log_channel_id=LOG_CHANNEL_ID
 )
 
-logger = logging.getLogger("bot")  # можно использовать именованный логгер
+logger = setup_logger(name="bot", level=LOG_LEVEL)
 
 async def main():
     try:
         init_db()
         cleanup_old_mappings(days=2)
         cleanup_forwarded_news(days=7)
+        logger.info("[DB] Очистка forwarded_news при запуске завершена")
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
         return
@@ -46,6 +48,7 @@ async def main():
             try:
                 cleanup_old_mappings(days=2)
                 cleanup_forwarded_news(days=2)
+                logger.info("[DB] Очистка forwarded_news (ежедневная) завершена")
                 logger.info("[DB] Автоочистка завершена")
             except Exception as e:
                 logger.error(f"[DB] Ошибка автоочистки: {e}")

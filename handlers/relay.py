@@ -6,10 +6,11 @@ from typing import List
 from utils.config import ADMIN_GROUP_ID
 from utils.db import save_mapping, get_user_by_forwarded, is_banned, is_muted, get_admin_msg_id, get_user_reply_msg, \
     save_reply_mapping
-from utils.logger import setup_logger
+from utils.logger import get_logger
 
 router = Router()
-logger = setup_logger("relay")
+logger = get_logger("relay")
+logger.info("[RELAY] relay.py загружен")
 
 def format_caption(user: User, original: str = "") -> str:
     name = f'<a href="tg://user?id={user.id}">{user.full_name}</a>'

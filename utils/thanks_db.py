@@ -2,6 +2,10 @@
 
 import sqlite3
 from utils.config import DB_PATH
+from utils.logger import get_logger
+
+logger = get_logger("thanks_db")
+logger.info("[THANKS_DB] thanks_db.py загружен")
 
 def init_thanks_table():
     conn = sqlite3.connect(DB_PATH)

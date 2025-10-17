@@ -3,8 +3,11 @@
 import sqlite3
 import os
 from datetime import datetime, timedelta
-from utils.logger import setup_logger
+from utils.logger import get_logger
 from utils.config import DB_PATH
+
+logger = get_logger("db")
+logger.info("[DB] db.py загружен")
 
 def init_db():
     os.makedirs("data", exist_ok=True)
@@ -99,7 +102,7 @@ def mark_user_sent(user_id: int):
     conn.close()
 
 def mute_user(user_id: int, muted_until: str):
-    logger = setup_logger("db")
+    logger = get_logger("db")
     logger.info(f"[DB] mute_user: user_id={user_id}, until={muted_until}")
 
     conn = sqlite3.connect(DB_PATH)
@@ -120,7 +123,7 @@ def unmute_user(user_id: int):
     conn.close()
 
 def ban_user(user_id: int, banned_at: str):
-    logger = setup_logger("db")
+    logger = get_logger("db")
     logger.info(f"[DB] ban_user: user_id={user_id}, banned_at={banned_at}")
 
     conn = sqlite3.connect(DB_PATH)
@@ -149,7 +152,7 @@ def is_banned(user_id: int) -> bool:
     return result and result[0] == 1
 
 def is_muted(user_id: int) -> bool:
-    logger = setup_logger("db")
+    logger = get_logger("db")
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT muted_until FROM moderation WHERE user_id = ?", (user_id,))
@@ -182,7 +185,7 @@ def get_admin_msg_id(user_id: int, user_msg_id: int) -> int | None:
     return result[0] if result else None
 
 def save_reply_mapping(admin_msg_id: int, user_id: int, user_msg_id: int):
-    logger = setup_logger("db")  # ← добавляем логгер
+    logger = get_logger("db")  # ← добавляем логгер
     logger.info(f"[DB] save_reply_mapping: admin_msg_id={admin_msg_id}, user_id={user_id}, user_msg_id={user_msg_id}")
 
     conn = sqlite3.connect(DB_PATH)
@@ -243,5 +246,5 @@ def cleanup_old_mappings(days: int = 2):
     conn.commit()
     conn.close()
 
-    logger = setup_logger("db")
+    logger = get_logger("db")
     logger.info(f"[DB] Очистка старых связей: удалено всё старше {cutoff}")

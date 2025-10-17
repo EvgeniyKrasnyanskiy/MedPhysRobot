@@ -1,8 +1,10 @@
 # handlers/moderation.py
 
 from aiogram import Router, F, Bot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
 from aiogram.filters import Command
+
 from utils.db import (
     mute_user,
     unmute_user,
@@ -11,15 +13,16 @@ from utils.db import (
     get_user_by_forwarded,
     get_user_status
 )
-from utils.config import ADMIN_GROUP_ID
-from utils.logger import setup_logger
+from utils.config import ADMIN_GROUP_ID, MEDPHYSPRO_GROUP_ID, LOG_CHANNEL_ID, MEDPHYSPRO_GROUP_TOPIC_ID
+from utils.logger import get_logger
 from datetime import datetime, timedelta
 import asyncio
 
-router = Router()
-logger = setup_logger("moderation")
-logger.info("[MOD] moderation.py загружен")
+from utils.sender import send_content_to_group
 
+router = Router()
+logger = get_logger("moderation")
+logger.info("[MOD] moderation.py загружен")
 
 def extract_user_id_from_reply(message: Message) -> int | None:
     if not message.reply_to_message:
@@ -189,4 +192,45 @@ async def cmd_status(message: Message):
 
     await message.answer(f"✅ У пользователя {user_id} нет ограничений.")
 
+# ↪️/send_to_pro_group
+@router.message(Command("send_to_pro_group"), F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
+async def send_to_pro_group(message: Message):
+    try:
+        thread_id = MEDPHYSPRO_GROUP_TOPIC_ID
+        suffix = ""  # Можно добавить подпись, если нужно
+
+        sent = await send_content_to_group(
+            message=message.reply_to_message,
+            bot=message.bot,
+            chat_id=MEDPHYSPRO_GROUP_ID,
+            thread_id=thread_id,
+            suffix=suffix
+        )
+
+        if not sent:
+            await message.reply("⚠️ Не удалось определить тип сообщения для пересылки")
+            return
+
+        # Лог в файл
+        logger.info(
+            f"[MOD] Переслано в PRO-группу: from_msg_id={message.reply_to_message.message_id}, "
+            f"to_msg_id={sent.message_id}, by={message.from_user.id}"
+        )
+
+        # Лог в канал логов
+        await message.bot.send_message(
+            chat_id=LOG_CHANNEL_ID,
+            text=(
+                f"📤 <b>Переслано из админской группы в PRO-группу</b>\n"
+                f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
+                f"📨 Новое msg_id: <code>{sent.message_id}</code>\n"
+                f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{message.from_user.full_name}</a>"
+            ),
+            parse_mode="HTML"
+        )
+
+        await message.reply("✅ Сообщение отправлено в PRO-группу")
+
+    except TelegramBadRequest as e:
+        await message.reply(f"❌ Ошибка при пересылке: {e.message}")
 

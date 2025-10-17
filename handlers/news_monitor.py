@@ -9,22 +9,12 @@ from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest
 from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, MEDPHYSPRO_GROUP_TOPIC_ID, DB_PATH, \
     MEDPHYSPRO_CHANNEL_USERNAME
-from utils.logger import setup_logger
+from utils.logger import get_logger
+from utils.sender import send_content_to_group
 
 router = Router()
-logger = setup_logger("news_monitor")
-
-def resolve_thread_id(raw_id: str | None) -> int | None:
-    try:
-        if not raw_id or str(raw_id).strip() in ("", "0", "1"):
-            return None
-        thread_id = int(raw_id)
-        if thread_id <= 1:
-            return None
-        return thread_id
-    except ValueError:
-        logger.warning(f"[NEWS] Некорректный MEDPHYSPRO_GROUP_TOPIC_ID: {raw_id}")
-        return None
+logger = get_logger("news_monitor")
+logger.info("[NEWS_MONITOR] news_monitor.py загружен")
 
 def init_forwarded_news_table():
     conn = sqlite3.connect(DB_PATH)
@@ -86,40 +76,19 @@ async def forward_news(message: Message, bot: Bot):
         logger.info(f"[NEWS] Пропущено по хешу: message_id={message.message_id}")
         return
 
-    thread_id = resolve_thread_id(MEDPHYSPRO_GROUP_TOPIC_ID)
+    thread_id = MEDPHYSPRO_GROUP_TOPIC_ID
     suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
 
     try:
-        sent = None
+        sent = await send_content_to_group(
+            message=message,
+            bot=bot,
+            chat_id=MEDPHYSPRO_GROUP_ID,
+            thread_id=thread_id,
+            suffix=suffix
+        )
 
-        if message.photo:
-            sent = await bot.send_photo(
-                chat_id=MEDPHYSPRO_GROUP_ID,
-                photo=message.photo[-1].file_id,
-                caption=(message.caption or "") + suffix,
-                message_thread_id=thread_id
-            )
-        elif message.video:
-            sent = await bot.send_video(
-                chat_id=MEDPHYSPRO_GROUP_ID,
-                video=message.video.file_id,
-                caption=(message.caption or "") + suffix,
-                message_thread_id=thread_id
-            )
-        elif message.document:
-            sent = await bot.send_document(
-                chat_id=MEDPHYSPRO_GROUP_ID,
-                document=message.document.file_id,
-                caption=(message.caption or "") + suffix,
-                message_thread_id=thread_id
-            )
-        elif message.text:
-            sent = await bot.send_message(
-                chat_id=MEDPHYSPRO_GROUP_ID,
-                text=message.text + suffix,
-                message_thread_id=thread_id
-            )
-        else:
+        if not sent:
             logger.warning(f"[NEWS] Неизвестный тип сообщения: message_id={message.message_id}")
             return
 
@@ -152,16 +121,24 @@ async def handle_edited_news(message: Message, bot: Bot):
 
     try:
         if message.text:
+            text = message.text
+            if suffix not in text:
+                text += suffix
+
             await bot.edit_message_text(
                 chat_id=MEDPHYSPRO_GROUP_ID,
                 message_id=group_msg_id,
-                text=message.text + suffix
+                text=text
             )
         elif message.caption:
+            caption = message.caption
+            if suffix not in caption:
+                caption += suffix
+
             await bot.edit_message_caption(
                 chat_id=MEDPHYSPRO_GROUP_ID,
                 message_id=group_msg_id,
-                caption=message.caption + suffix
+                caption=caption
             )
         else:
             logger.warning(f"[NEWS] Не удалось отредактировать: message_id={message.message_id} — нет текста или caption")

@@ -11,9 +11,10 @@ from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, MEDPHYSPRO_
     MEDPHYSPRO_CHANNEL_USERNAME
 from utils.logger import get_logger
 from utils.sender import send_content_to_group
+from utils.topics import resolve_topic_id_by_keywords
 
 router = Router()
-logger = get_logger("news_monitor")
+logger = get_logger("news")  # ← вместо "news_monitor"
 logger.info("[NEWS_MONITOR] news_monitor.py загружен")
 
 def init_forwarded_news_table():
@@ -76,7 +77,7 @@ async def forward_news(message: Message, bot: Bot):
         logger.info(f"[NEWS] Пропущено по хешу: message_id={message.message_id}")
         return
 
-    thread_id = MEDPHYSPRO_GROUP_TOPIC_ID
+    thread_id = resolve_topic_id_by_keywords(message, default_thread_id=MEDPHYSPRO_GROUP_TOPIC_ID)
     suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
 
     try:
@@ -161,6 +162,6 @@ def cleanup_forwarded_news(days: int = 7):
     conn.commit()
     conn.close()
 
-    logger.info(f"[DB] Очистка forwarded_news: удалено {deleted} записей старше {iso_threshold}")
+    logger.info(f"[DB] Очистка пересланных сообщений в канал старше 7 дней: удалено {deleted} записей старше {iso_threshold}")
 
 

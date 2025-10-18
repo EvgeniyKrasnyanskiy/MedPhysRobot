@@ -10,62 +10,29 @@ from aiogram.client.default import DefaultBotProperties
 from handlers.news_monitor import cleanup_forwarded_news
 from utils.db import init_db, cleanup_old_mappings
 
-from handlers import start, relay, news_monitor, status, moderation
-from utils.commands import setup_bot_commands
-from handlers import help
+from handlers import start, relay, news_monitor, status, moderation, help, thanks
 from middlewares.album import AlbumMiddleware
-from handlers import thanks
+from utils.commands import setup_bot_commands
 
-from utils.logger import setup_logger
-from utils.config import BOT_TOKEN, DEBUG_MODE, LOG_LEVEL, ENABLE_TELEGRAM_LOGGING, LOG_CHANNEL_ID
+from utils.logger import init_all_loggers, start_telegram_loggers, flush_telegram_loggers
+from utils.config import BOT_TOKEN, DEBUG_MODE
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 
-# Инициализация root-логгера
-setup_logger(
-    name="bot",
-    level=LOG_LEVEL,
-    bot=bot,
-    enable_telegram_logging=True,
-    log_channel_id=LOG_CHANNEL_ID
-)
+# Централизованная инициализация всех логгеров
+init_all_loggers(bot)
+logger = logging.getLogger("bot")
 
-logger = setup_logger(name="bot", level=LOG_LEVEL)
 
 async def main():
     try:
         init_db()
         cleanup_old_mappings(days=2)
         cleanup_forwarded_news(days=7)
-        logger.info("[DB] Очистка forwarded_news при запуске завершена")
+        logger.info("[DB] Все старые связи успешно очищены при запуске бота")
     except Exception as e:
         logger.error(f"Ошибка при инициализации БД: {e}")
         return
-
-    # Фоновая задача: автоочистка каждые 24 часа
-    async def periodic_cleanup():
-        while True:
-            try:
-                cleanup_old_mappings(days=2)
-                cleanup_forwarded_news(days=2)
-                logger.info("[DB] Очистка forwarded_news (ежедневная) завершена")
-                logger.info("[DB] Автоочистка завершена")
-            except Exception as e:
-                logger.error(f"[DB] Ошибка автоочистки: {e}")
-            await asyncio.sleep(86400)  # 24 часа
-
-    asyncio.create_task(periodic_cleanup())
-
-    # Запускаем автофлеш Telegram-хендлера (внутри активного event loop)
-    def get_all_handlers(logger):
-        handlers = list(logger.handlers)
-        if logger.propagate and logger.parent:
-            handlers += get_all_handlers(logger.parent)
-        return handlers
-
-    for handler in get_all_handlers(logging.getLogger("bot")):
-        if hasattr(handler, "start"):
-            handler.start()
 
     await setup_bot_commands(bot)
     dp = Dispatcher(storage=MemoryStorage())
@@ -79,13 +46,29 @@ async def main():
     dp.include_router(status.router)
     dp.include_router(thanks.router)
 
-    # Принудительная отправка буфера перед polling
-    for handler in logger.handlers:
-        if hasattr(handler, "_flush"):
-            await handler._flush()
+    # Фоновая задача: автоочистка каждые 24 часа
+    async def periodic_cleanup():
+        while True:
+            try:
+                cleanup_old_mappings(days=2)
+                cleanup_forwarded_news(days=7)
+                logger.info("[DB] Периодическая очистка всех старых связей успешно завершена")
+            except Exception as e:
+                logger.error(f"[DB] Ошибка автоочисток: {e}")
+            await asyncio.sleep(86400)
 
-    logger.info("Бот готов к работе")
+    # Принудительный сброс буфера Telegram-хендлера
+    await flush_telegram_loggers()
+
+    # Включаем автофлеш и запускаем фоновую задачу
+    start_telegram_loggers()
+    asyncio.create_task(periodic_cleanup())
+
+    # Финальные логи запуска
+    await asyncio.sleep(0.1)  # дать автоочистке шанс залогировать
     logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")
+    logger.info("[STARTUP] Бот полностью готов")
+
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

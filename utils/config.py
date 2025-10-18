@@ -82,7 +82,7 @@ MEDPHYSPRO_CHANNEL_ID = get_env_var("MEDPHYSPRO_CHANNEL_ID", int)
 
 MEDPHYSPRO_GROUP_ID = get_env_var("MEDPHYSPRO_GROUP_ID", int)
 ADMIN_GROUP_ID = get_env_var("ADMIN_GROUP_ID", int)
-MEDPHYSPRO_GROUP_TOPIC_ID = resolve_int_env("MEDPHYSPRO_GROUP_TOPIC_ID")
+MEDPHYSPRO_GROUP_TOPIC_ID = resolve_int_env("MEDPHYSPRO_GROUP_TOPIC_ID", min_value=0)
 
 LOG_FILE = get_env_var("LOG_FILE", str, required=False, default="medphysbot.log")
 LOG_CHANNEL_ID = resolve_int_env("LOG_CHANNEL_ID", min_value=-10**13, default=-1)

@@ -6,9 +6,9 @@ from aiogram.filters import Command
 from utils.db import get_user_status
 from utils.config import ADMIN_GROUP_ID
 from datetime import datetime
-from utils.logger import setup_logger
+from utils.logger import get_logger
 
-logger = setup_logger("status")
+logger = get_logger("status")
 router = Router()
 
 @router.message(F.chat.id == ADMIN_GROUP_ID, Command("/status"))

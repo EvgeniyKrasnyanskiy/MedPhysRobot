@@ -246,5 +246,4 @@ def cleanup_old_mappings(days: int = 2):
     conn.commit()
     conn.close()
 
-    logger = get_logger("db")
-    logger.info(f"[DB] Очистка старых связей: удалено всё старше {cutoff}")
+    logger.info(f"[DB] Очистка связей пересланных сообщений в админке старше 2 дней: удалено всё старше {cutoff}")

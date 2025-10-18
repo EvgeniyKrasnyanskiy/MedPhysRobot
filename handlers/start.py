@@ -3,9 +3,9 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import CommandStart
-from utils.logger import setup_logger
+from utils.logger import get_logger
 
-logger = setup_logger("start")
+logger = get_logger("start")
 router = Router()
 
 @router.message(CommandStart())

@@ -2,7 +2,9 @@
 
 import os
 from dotenv import load_dotenv
+from typing import Type, TypeVar
 
+T = TypeVar("T")
 load_dotenv()
 
 def resolve_bool_env(var_name: str, default: bool = False) -> bool:
@@ -13,16 +15,22 @@ def resolve_bool_env(var_name: str, default: bool = False) -> bool:
     raw = os.getenv(var_name)
     if raw is None:
         return default
+
     value = raw.strip().lower()
-    if value in ("true", "1", "yes"):
+    truthy = {"true", "1", "yes", "on"}
+    falsy = {"false", "0", "no", "off"}
+
+    if value in truthy:
         return True
-    elif value in ("false", "0", "no"):
+    elif value in falsy:
         return False
-    else:
-        from utils.logger import get_logger
-        logger = get_logger("config")
-        logger.warning(f"[CONFIG] Некорректное булево значение {var_name}={raw!r} — используется default={default}")
-        return default
+
+    from utils.logger import get_logger
+    logger = get_logger("config")
+    logger.warning(
+        f"[CONFIG] Некорректное булево значение {var_name}={raw!r} — используется default={default}"
+    )
+    return default
 
 def resolve_int_env(
     var_name: str,
@@ -55,7 +63,7 @@ def resolve_int_env(
         logger.warning(f"[CONFIG] Переменная {var_name} содержит нечисловое значение: {raw}")
         return default
 
-def get_env_var(name: str, cast_type=str, required=True, default=None):
+def get_env_var(name: str, cast_type: Type[T] = str, required: bool = True, default: T | None = None) -> T | None:
     value = os.getenv(name, default)
     if required and value is None:
         from utils.logger import get_logger

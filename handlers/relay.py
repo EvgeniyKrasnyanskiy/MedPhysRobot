@@ -19,7 +19,7 @@ def format_caption(user: User, original: str = "") -> str:
         return f"{header}\n\n{original}"
     return header
 
-async def relay_content(message: Message, bot: Bot, user: User) -> Message | None:
+async def relay_content(message: Message, bot: Bot) -> Message | None:
     if message.photo:
         return await bot.send_photo(
             chat_id=ADMIN_GROUP_ID,
@@ -127,7 +127,7 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
 
         # 📦 Всё остальное
         else:
-            sent = await relay_content(message, bot, user)
+            sent = await relay_content(message, bot)
             if sent:
                 save_mapping(sent.message_id, user.id, message.message_id)
                 logger.info(f"[RELAY] Контент от {user.id} ({user.full_name})")

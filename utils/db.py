@@ -2,7 +2,7 @@
 
 import sqlite3
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from utils.logger import get_logger
 from utils.config import DB_PATH
 
@@ -102,7 +102,6 @@ def mark_user_sent(user_id: int):
     conn.close()
 
 def mute_user(user_id: int, muted_until: str):
-    logger = get_logger("db")
     logger.info(f"[DB] mute_user: user_id={user_id}, until={muted_until}")
 
     conn = sqlite3.connect(DB_PATH)
@@ -123,7 +122,6 @@ def unmute_user(user_id: int):
     conn.close()
 
 def ban_user(user_id: int, banned_at: str):
-    logger = get_logger("db")
     logger.info(f"[DB] ban_user: user_id={user_id}, banned_at={banned_at}")
 
     conn = sqlite3.connect(DB_PATH)
@@ -152,7 +150,6 @@ def is_banned(user_id: int) -> bool:
     return result and result[0] == 1
 
 def is_muted(user_id: int) -> bool:
-    logger = get_logger("db")
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT muted_until FROM moderation WHERE user_id = ?", (user_id,))
@@ -164,7 +161,7 @@ def is_muted(user_id: int) -> bool:
     if result and result[0]:
         try:
             until = datetime.fromisoformat(result[0])
-            if datetime.utcnow() >= until:
+            if datetime.now(timezone.utc) >= until:
                 unmute_user(user_id)
                 logger.info(f"[DB] mute expired — user_id={user_id} размьючен автоматически")
                 return False
@@ -185,7 +182,6 @@ def get_admin_msg_id(user_id: int, user_msg_id: int) -> int | None:
     return result[0] if result else None
 
 def save_reply_mapping(admin_msg_id: int, user_id: int, user_msg_id: int):
-    logger = get_logger("db")  # ← добавляем логгер
     logger.info(f"[DB] save_reply_mapping: admin_msg_id={admin_msg_id}, user_id={user_id}, user_msg_id={user_msg_id}")
 
     conn = sqlite3.connect(DB_PATH)
@@ -228,8 +224,8 @@ def get_user_status(user_id: int) -> dict:
         status["banned_at"] = result[1]
         if result[2]:
             try:
-                muted_until = datetime.fromisoformat(result[2])
-                status["muted"] = datetime.utcnow() < muted_until
+                muted_until = datetime.fromisoformat(result[2]).replace(tzinfo=timezone.utc)
+                status["muted"] = datetime.now(timezone.utc) < muted_until
                 status["muted_until"] = result[2]
             except ValueError:
                 status["muted"] = False
@@ -237,7 +233,7 @@ def get_user_status(user_id: int) -> dict:
     return status
 
 def cleanup_old_mappings(days: int = 2):
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 

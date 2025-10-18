@@ -53,8 +53,8 @@ async def main():
                 cleanup_old_mappings(days=2)
                 cleanup_forwarded_news(days=7)
                 logger.info("[DB] Периодическая очистка всех старых связей успешно завершена")
-            except Exception as e:
-                logger.error(f"[DB] Ошибка автоочисток: {e}")
+            except Exception as exc:
+                logger.error(f"[DB] Ошибка автоочисток: {exc}")
             await asyncio.sleep(86400)
 
     # Принудительный сброс буфера Telegram-хендлера

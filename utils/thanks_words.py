@@ -1,7 +1,5 @@
 # utils/thanks_words.py
 
-import logging
-
 from utils.logger import get_logger
 from utils.paths import THANKS_WORDS_PATH
 

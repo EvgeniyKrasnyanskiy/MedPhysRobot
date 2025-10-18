@@ -91,6 +91,8 @@ async def flush_telegram_loggers():
     Принудительно сбрасывает буфер Telegram-хендлера.
     """
     if _telegram_handler:
-        await _telegram_handler._flush()
+        # type: ignore[attr-defined]
+        await _telegram_handler._flush()  # noqa
+
 
 

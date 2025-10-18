@@ -50,8 +50,8 @@ class TelegramLogHandler(logging.Handler):
         text = "\n".join(self.buffer)
         self.buffer.clear()
 
-        MAX_LENGTH = 4000
-        chunks = [text[i:i + MAX_LENGTH] for i in range(0, len(text), MAX_LENGTH)]
+        max_length = 4000
+        chunks = [text[i:i + max_length] for i in range(0, len(text), max_length)]
         if DEBUG_MODE:
             print(f"[LOGGER] flush: отправляем {len(chunks)} чанков в Telegram")
 

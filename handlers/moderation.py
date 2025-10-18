@@ -15,7 +15,7 @@ from utils.db import (
 )
 from utils.config import ADMIN_GROUP_ID, MEDPHYSPRO_GROUP_ID, LOG_CHANNEL_ID, MEDPHYSPRO_GROUP_TOPIC_ID
 from utils.logger import get_logger
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 
 from utils.sender import send_content_to_group
@@ -64,7 +64,7 @@ async def cmd_mute(message: Message, bot: Bot):
         await reply_required(message, "/mute")
         return
 
-    muted_until = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+    muted_until = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
     mute_user(user_id, muted_until=muted_until)
 
     logger.info(f"[MOD] Замьючен user_id={user_id} до {muted_until} UTC")
@@ -120,7 +120,7 @@ async def cmd_ban(message: Message, bot: Bot):
         await reply_required(message, "/ban")
         return
 
-    banned_at = datetime.utcnow().isoformat()
+    banned_at = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
     ban_user(user_id, banned_at=banned_at)
 
     logger.info(f"[MOD] Забанен user_id={user_id} в {banned_at} UTC")

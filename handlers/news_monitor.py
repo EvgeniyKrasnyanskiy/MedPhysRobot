@@ -2,7 +2,7 @@
 
 import sqlite3
 import hashlib
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 from aiogram import Router, Bot
 from aiogram.types import Message
@@ -152,7 +152,7 @@ async def handle_edited_news(message: Message, bot: Bot):
         logger.exception(f"[NEWS] Неожиданная ошибка при редактировании: {e}")
 
 def cleanup_forwarded_news(days: int = 7):
-    threshold = datetime.utcnow() - timedelta(days=days)
+    threshold = datetime.now(timezone.utc) - timedelta(days=days)
     iso_threshold = threshold.isoformat()
 
     conn = sqlite3.connect(DB_PATH)

@@ -1,7 +1,7 @@
 # utils/commands.py
 
 from aiogram import Bot
-from utils.config import ADMIN_GROUP_ID, MEDPHYSPRO_GROUP_ID, LOG_LEVEL
+from utils.config import ADMIN_GROUP_ID, MEDPHYSPRO_GROUP_ID
 from aiogram.types import (
     BotCommand,
     BotCommandScopeChat,

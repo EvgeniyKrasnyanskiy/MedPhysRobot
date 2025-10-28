@@ -1,7 +1,8 @@
 # handlers/relay.py
 
 from aiogram import Router, F, Bot
-from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, User
+from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio, User
+
 from typing import List
 from utils.config import ADMIN_GROUP_ID
 from utils.db import save_mapping, get_user_by_forwarded, is_banned, is_muted, get_admin_msg_id, get_user_reply_msg, \
@@ -140,7 +141,7 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
 
 
 @router.message(F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
-async def handle_group_reply(message: Message, bot: Bot, album: List[Message] = None):
+async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = None):
     forwarded_id = message.reply_to_message.message_id
     user_id = get_user_by_forwarded(forwarded_id)
 
@@ -149,29 +150,93 @@ async def handle_group_reply(message: Message, bot: Bot, album: List[Message] = 
         return
 
     try:
+        # --- Альбом (несколько фото/видео/доков/аудио) ---
         if album:
             media = []
             for msg in album:
                 if msg.photo:
-                    media.append(
-                        InputMediaPhoto(media=msg.photo[-1].file_id, caption=msg.caption or "", parse_mode="HTML"))
+                    media.append(InputMediaPhoto(
+                        media=msg.photo[-1].file_id,
+                        caption=msg.caption or "",
+                        parse_mode="HTML"
+                    ))
                 elif msg.video:
-                    media.append(InputMediaVideo(media=msg.video.file_id, caption=msg.caption or "", parse_mode="HTML"))
-            sent = await bot.send_media_group(chat_id=user_id, media=media)
-            save_reply_mapping(admin_msg_id=message.message_id, user_id=user_id, user_msg_id=sent[0].message_id)
-            logger.info(f"[RELAY] Ответ-альбом отправлен пользователю {user_id}")
+                    media.append(InputMediaVideo(
+                        media=msg.video.file_id,
+                        caption=msg.caption or "",
+                        parse_mode="HTML"
+                    ))
+                elif msg.document:
+                    media.append(InputMediaDocument(
+                        media=msg.document.file_id,
+                        caption=msg.caption or "",
+                        parse_mode="HTML"
+                    ))
+                elif msg.audio:
+                    media.append(InputMediaAudio(
+                        media=msg.audio.file_id,
+                        caption=msg.caption or "",
+                        parse_mode="HTML"
+                    ))
+            if media:
+                sent = await bot.send_media_group(chat_id=user_id, media=media)
+                save_reply_mapping(admin_msg_id=message.message_id,
+                                   user_id=user_id,
+                                   user_msg_id=sent[0].message_id)
+                logger.info(f"[RELAY] Ответ-альбом отправлен пользователю {user_id}")
+            else:
+                logger.warning(f"[RELAY] Альбом не содержит поддерживаемых типов")
 
+        # --- Одиночное сообщение ---
         else:
-            sent = await bot.send_message(
-                chat_id=user_id,
-                text=message.text,
-                parse_mode="HTML"
-            )
-            save_reply_mapping(admin_msg_id=message.message_id, user_id=user_id, user_msg_id=sent.message_id)
+            if message.text:
+                sent = await bot.send_message(
+                    chat_id=user_id,
+                    text=message.text,
+                    parse_mode="HTML"
+                )
+            elif message.photo:
+                sent = await bot.send_photo(
+                    chat_id=user_id,
+                    photo=message.photo[-1].file_id,
+                    caption=message.caption or ""
+                )
+            elif message.video:
+                sent = await bot.send_video(
+                    chat_id=user_id,
+                    video=message.video.file_id,
+                    caption=message.caption or ""
+                )
+            elif message.document:
+                sent = await bot.send_document(
+                    chat_id=user_id,
+                    document=message.document.file_id,
+                    caption=message.caption or ""
+                )
+            elif message.audio:
+                sent = await bot.send_audio(
+                    chat_id=user_id,
+                    audio=message.audio.file_id,
+                    caption=message.caption or ""
+                )
+            elif message.voice:
+                sent = await bot.send_voice(
+                    chat_id=user_id,
+                    voice=message.voice.file_id,
+                    caption=message.caption or ""
+                )
+            else:
+                logger.warning(f"[RELAY] Неизвестный тип сообщения: {message.content_type}")
+                return
 
+            save_reply_mapping(admin_msg_id=message.message_id,
+                               user_id=user_id,
+                               user_msg_id=sent.message_id)
             logger.info(f"[RELAY] Ответ отправлен пользователю {user_id}")
+
     except Exception as e:
         logger.error(f"[RELAY] Ошибка пересылки ответа: {e}")
+
 
 @router.edited_message(F.chat.type == "private")
 async def handle_edited_private_message(message: Message, bot: Bot):

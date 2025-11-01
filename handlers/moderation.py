@@ -18,11 +18,17 @@ from utils.logger import get_logger
 from datetime import datetime, timedelta, timezone
 import asyncio
 
-from utils.sender import send_content_to_group
 
 router = Router()
 logger = get_logger("moderation")
 logger.info("[MOD] moderation.py загружен")
+
+MAX_CAPTION = 1024
+MAX_TEXT = 4096  # лимит для обычного send_message
+
+def split_text(text: str, limit: int) -> list[str]:
+    """Разбивает текст на части по limit символов."""
+    return [text[i:i+limit] for i in range(0, len(text), limit)]
 
 def extract_user_id_from_reply(message: Message) -> int | None:
     if not message.reply_to_message:
@@ -192,36 +198,97 @@ async def cmd_status(message: Message):
 
     await message.answer(f"✅ У пользователя {user_id} нет ограничений.")
 
+
 # ↪️/send_to_pro_group
 @router.message(Command("send_to_pro_group"), F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
 async def send_to_pro_group(message: Message):
     try:
-        thread_id = MEDPHYSPRO_GROUP_TOPIC_ID
-        suffix = ""  # Можно добавить подпись, если нужно
+        tid = MEDPHYSPRO_GROUP_TOPIC_ID if MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0 else None
+        suffix = ""
 
-        sent = await send_content_to_group(
-            message=message.reply_to_message,
-            bot=message.bot,
-            chat_id=MEDPHYSPRO_GROUP_ID,
-            thread_id=thread_id,
-            suffix=suffix
-        )
+        base_text = (message.reply_to_message.caption or message.reply_to_message.text or "")
+        if suffix:
+            base_text += f"\n{suffix}"
+
+        sent = None
+
+        # Если это медиа (фото/видео/документ/аудио/voice)
+        if message.reply_to_message.photo or message.reply_to_message.video or message.reply_to_message.document \
+           or message.reply_to_message.audio or message.reply_to_message.voice:
+
+            # Разбиваем текст на caption + остаток
+            parts = split_text(base_text, MAX_CAPTION)
+            caption = parts[0] if parts else None
+            rest = parts[1:] if len(parts) > 1 else []
+
+            if message.reply_to_message.photo:
+                sent = await message.bot.send_photo(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    photo=message.reply_to_message.photo[-1].file_id,
+                    caption=caption,
+                    message_thread_id=tid
+                )
+            elif message.reply_to_message.video:
+                sent = await message.bot.send_video(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    video=message.reply_to_message.video.file_id,
+                    caption=caption,
+                    message_thread_id=tid
+                )
+            elif message.reply_to_message.document:
+                sent = await message.bot.send_document(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    document=message.reply_to_message.document.file_id,
+                    caption=caption,
+                    message_thread_id=tid
+                )
+            elif message.reply_to_message.audio:
+                sent = await message.bot.send_audio(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    audio=message.reply_to_message.audio.file_id,
+                    caption=caption,
+                    message_thread_id=tid
+                )
+            elif message.reply_to_message.voice:
+                sent = await message.bot.send_voice(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    voice=message.reply_to_message.voice.file_id,
+                    caption=caption,
+                    message_thread_id=tid
+                )
+
+            # Отправляем остаток текста отдельными сообщениями
+            for chunk in rest:
+                await message.bot.send_message(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    text=chunk,
+                    message_thread_id=tid
+                )
+
+        # Если это чистый текст
+        elif message.reply_to_message.text:
+            parts = split_text(base_text, MAX_TEXT)
+            for idx, chunk in enumerate(parts):
+                sent = await message.bot.send_message(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    text=chunk,
+                    message_thread_id=tid
+                )
 
         if not sent:
             await message.reply("⚠️ Не удалось определить тип сообщения для пересылки")
             return
 
-        # Лог в файл
         logger.info(
             f"[MOD] Переслано в PRO-группу: from_msg_id={message.reply_to_message.message_id}, "
-            f"to_msg_id={sent.message_id}, by={message.from_user.id}"
+            f"to_msg_id={sent.message_id}, by={message.from_user.id}, thread_id={tid}"
         )
 
-        # Лог в канал логов
         await message.bot.send_message(
             chat_id=LOG_CHANNEL_ID,
             text=(
                 f"📤 <b>Переслано из админской группы в PRO-группу</b>\n"
+                f"🧵 thread_id: <code>{tid}</code>\n"
                 f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
                 f"📨 Новое msg_id: <code>{sent.message_id}</code>\n"
                 f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{message.from_user.full_name}</a>"

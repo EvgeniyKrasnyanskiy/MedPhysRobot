@@ -7,8 +7,7 @@ from datetime import timedelta, datetime, timezone
 from aiogram import Router, Bot
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest
-from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, MEDPHYSPRO_GROUP_TOPIC_ID, DB_PATH, \
-    MEDPHYSPRO_CHANNEL_USERNAME
+from utils.config import MEDPHYSPRO_CHANNEL_ID, MEDPHYSPRO_GROUP_ID, DB_PATH, MEDPHYSPRO_CHANNEL_USERNAME
 from utils.logger import get_logger
 from utils.sender import send_content_to_group
 from utils.topics import resolve_topic_id_by_keywords
@@ -77,7 +76,7 @@ async def forward_news(message: Message, bot: Bot):
         logger.info(f"[NEWS] Пропущено по хешу: message_id={message.message_id}")
         return
 
-    thread_id = resolve_topic_id_by_keywords(message, default_thread_id=MEDPHYSPRO_GROUP_TOPIC_ID)
+    thread_id = resolve_topic_id_by_keywords(message)
     suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
 
     try:

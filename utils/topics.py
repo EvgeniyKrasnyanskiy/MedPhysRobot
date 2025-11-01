@@ -5,16 +5,21 @@ from utils.logger import get_logger
 
 # Маршрутизация новостей по ключевым словам
 # Ключ — thread_id, значение — список ключевых слов (в любом регистре)
+
 TOPIC_KEYWORDS = {
-    39883: ["#аккредитация", "#нмо"],  # Топик — Аккредитация
-    34319: ["#вакансия", "#работа"],  # Топик — Вакансии/Резюме/Практика
-    24854: ["#оборудование", "#аппараты"],  # Топик — Аппараты/Оборудование/Ремонт
-    24857: ["#образование", "#курсы", "#студентам"],  # Топик — Образование/Курсы/Студентам
+    39883: ["#аккредитация", "#нмо"],          # Аккредитация
+    34319: ["#вакансия", "#работа"],           # Вакансии/Резюме/Практика
+    24854: ["#оборудование", "#аппараты"],     # Аппараты/Оборудование/Ремонт
+    24857: ["#образование", "#курсы", "#студентам"],  # Образование/Курсы/Студентам
 }
 
 logger = get_logger("topics")
 
-def resolve_topic_id_by_keywords(message: Message, default_thread_id: int | None = None) -> int | None:
+def resolve_topic_id_by_keywords(message: Message) -> int | None:
+    """
+    Возвращает thread_id по ключевым словам.
+    Если ключевых слов нет → возвращает None (значит, уйдёт в General).
+    """
     text = (message.text or "") + (message.caption or "")
     lowered_text = text.lower()
 
@@ -24,6 +29,6 @@ def resolve_topic_id_by_keywords(message: Message, default_thread_id: int | None
                 logger.info(f"[TOPIC] Ключ '{keyword}' → thread_id={thread_id}")
                 return thread_id
 
-    logger.info(f"[TOPIC] Ключевые слова не найдены — используется default_thread_id={default_thread_id}")
-    return default_thread_id
+    logger.info("[TOPIC] Ключевых слов не найдено → отправляем в General (thread_id=None)")
+    return None
 

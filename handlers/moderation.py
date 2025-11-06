@@ -200,11 +200,25 @@ async def cmd_status(message: Message):
     await message.answer(f"✅ У пользователя {user_id} нет ограничений.")
 
 
-# ↪️/send_to_pro_group
+# ↪️ /send_to_pro_group
+@router.message(Command("send_to_pro_group"), F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
+async def cmd_send_to_pro_group(message: Message):
+    logger.info(f"[MOD] cmd_send_to_pro_group вызван: from_msg_id={message.reply_to_message.message_id}, by={message.from_user.id}")
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+
+    if not message.reply_to_message:
+        await reply_required(message, "/send_to_pro_group")
+        return
+
+    await send_to_pro_group(message)
+
+
 async def send_to_pro_group(message: Message):
     try:
         tid = MEDPHYSPRO_GROUP_TOPIC_ID if MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0 else None
         suffix = ""  # Или другой, если нужно
+        logger.info(f"[MOD] send_to_pro_group: tid={tid}, suffix='{suffix}', reply_type={message.reply_to_message.content_type}")
 
         sent_messages = await send_content_to_group(
             message=message.reply_to_message,
@@ -250,5 +264,3 @@ async def send_to_pro_group(message: Message):
     except Exception as e:
         logger.error(f"[MOD] Неизвестная ошибка: {e}")
         await message.reply("❌ Неизвестная ошибка.")
-
-

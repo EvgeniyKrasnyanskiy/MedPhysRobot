@@ -2,7 +2,7 @@
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import Message, MessageEntity
+from aiogram.types import Message, MessageEntity, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio, InputMediaAnimation
 from utils.logger import get_logger
 
 logger = get_logger("sender")
@@ -75,6 +75,22 @@ async def send_content_to_group(
     has_media = bool(message.photo or message.video or message.document or message.audio or message.voice or message.animation or message.sticker or message.video_note)
 
     try:
+        # Добавлено: Проверка на альбом (media group)
+        if message.media_group_id:
+            logger.info(f"[SENDER] Обнаружен альбом: media_group_id={message.media_group_id}")
+            # Для альбомов используем forward_message как fallback, т.к. разбиение не подходит
+            sent = await bot.forward_message(
+                chat_id=chat_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id,
+                **add_thread({})
+            )
+            sent_messages.append(sent)
+            if suffix:
+                extra = await bot.send_message(chat_id=chat_id, text=suffix, **add_thread({}))
+                sent_messages.append(extra)
+            return sent_messages
+
         # Fallback на copy_message для коротких/простых (сохраняет оригинал, быстрее)
         limit = MAX_CAPTION if has_media else MAX_TEXT
         if len(base_text) <= limit and not message.poll and not message.media_group_id:  # Не для опросов/альбомов

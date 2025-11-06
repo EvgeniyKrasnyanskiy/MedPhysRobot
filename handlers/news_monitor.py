@@ -32,6 +32,25 @@ def init_forwarded_news_table():
 
 def hash_message_content(message: Message) -> str:
     content = (message.text or "") + (message.caption or "")
+    # Добавляем уникальные идентификаторы для медиа, чтобы избежать одинаковых хешей для постов без текста
+    if message.photo:
+        content += message.photo[-1].file_unique_id
+    elif message.video:
+        content += message.video.file_unique_id
+    elif message.document:
+        content += message.document.file_unique_id
+    elif message.audio:
+        content += message.audio.file_unique_id
+    elif message.voice:
+        content += message.voice.file_unique_id
+    elif message.animation:
+        content += message.animation.file_unique_id
+    elif message.sticker:
+        content += message.sticker.file_unique_id
+    elif message.video_note:
+        content += message.video_note.file_unique_id
+    elif message.poll:
+        content += message.poll.question + ''.join(opt.text for opt in message.poll.options)
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 def is_hash_already_forwarded(content_hash: str) -> bool:
@@ -170,5 +189,3 @@ def cleanup_forwarded_news(days: int = 7):
     conn.close()
 
     logger.info(f"[DB] Очистка пересланных сообщений в канал старше 7 дней: удалено {deleted} записей старше {iso_threshold}")
-
-

@@ -65,6 +65,7 @@ def contains_deleted_marker(text: str | None) -> bool:
 
 init_forwarded_news_table()
 
+
 @router.channel_post()
 async def forward_news(message: Message, bot: Bot):
     if message.chat.id != MEDPHYSPRO_CHANNEL_ID:
@@ -80,7 +81,7 @@ async def forward_news(message: Message, bot: Bot):
     suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
 
     try:
-        sent = await send_content_to_group(
+        sent_messages = await send_content_to_group(  # Переименовал в sent_messages для ясности
             message=message,
             bot=bot,
             chat_id=MEDPHYSPRO_GROUP_ID,
@@ -88,12 +89,19 @@ async def forward_news(message: Message, bot: Bot):
             suffix=suffix
         )
 
-        if not sent:
-            logger.warning(f"[NEWS] Неизвестный тип сообщения: message_id={message.message_id}")
+        if not sent_messages:
+            logger.warning(
+                f"[NEWS] Неизвестный тип сообщения: message_id={message.message_id}, content_type={message.content_type}")
             return
 
-        save_forwarded_news(message.message_id, content_hash, group_msg_id=sent.message_id)
-        logger.info(f"[NEWS] Отправлено: message_id={message.message_id}, group_msg_id={sent.message_id}")
+        # Сохраняем ID первого сообщения (или все, если save_forwarded_news поддерживает list)
+        group_msg_id = sent_messages[0].message_id
+        save_forwarded_news(message.message_id, content_hash, group_msg_id=group_msg_id)
+
+        # Если частей >1, логируем все IDs
+        ids_str = ", ".join(str(m.message_id) for m in sent_messages)
+        logger.info(f"[NEWS] Отправлено: message_id={message.message_id}, group_msg_ids=[{ids_str}]")
+
     except Exception as e:
         logger.exception(f"[NEWS] Ошибка при отправке: {e}")
 

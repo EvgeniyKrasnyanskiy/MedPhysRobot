@@ -201,14 +201,11 @@ async def cmd_status(message: Message):
 
 
 # ↪️/send_to_pro_group
-@router.message(Command("send_to_pro_group"), F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
 async def send_to_pro_group(message: Message):
     try:
-        # Нормализуем значение из .env: если пусто/0/None — не использовать
         tid = MEDPHYSPRO_GROUP_TOPIC_ID if MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0 else None
-        suffix = ""
+        suffix = ""  # Или другой, если нужно
 
-        # Пересылаем через универсальную функцию
         sent_messages = await send_content_to_group(
             message=message.reply_to_message,
             bot=message.bot,
@@ -218,17 +215,21 @@ async def send_to_pro_group(message: Message):
         )
 
         if not sent_messages:
-            await message.reply("⚠️ Не удалось определить тип сообщения для пересылки")
-            return
+            logger.warning("[MOD] Не удалось переслать через send_content, fallback на forward")
+            forwarded = await message.bot.forward_message(
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                from_chat_id=message.reply_to_message.chat.id,
+                message_id=message.reply_to_message.message_id,
+                message_thread_id=tid
+            )
+            sent_messages = [forwarded]
 
-        # Логируем все msg_id
         ids_str = ", ".join(str(m.message_id) for m in sent_messages)
         logger.info(
             f"[MOD] Переслано в PRO-группу: from_msg_id={message.reply_to_message.message_id}, "
-            f"to_msg_ids=[{ids_str}], by={message.from_user.id}, thread_id={tid}"
+            f"to_msg_ids=[{ids_str}], by={message.from_user.id}, thread_id={tid}, suffix='{suffix}'"
         )
 
-        # Отправляем лог в канал
         await message.bot.send_message(
             chat_id=LOG_CHANNEL_ID,
             text=(
@@ -244,6 +245,10 @@ async def send_to_pro_group(message: Message):
         await message.reply("✅ Сообщение отправлено в PRO-группу")
 
     except TelegramBadRequest as e:
+        logger.error(f"[MOD] Ошибка: {e}")
         await message.reply(f"❌ Ошибка при пересылке: {e.message}")
+    except Exception as e:
+        logger.error(f"[MOD] Неизвестная ошибка: {e}")
+        await message.reply("❌ Неизвестная ошибка.")
 
 

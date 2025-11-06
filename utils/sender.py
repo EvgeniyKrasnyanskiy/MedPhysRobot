@@ -1,6 +1,7 @@
 # utils/sender.py
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message, MessageEntity
 from utils.logger import get_logger
 
@@ -62,6 +63,8 @@ async def send_content_to_group(
     Сохраняет entities/caption_entities для форматирования и скрытых ссылок.
     Возвращает список всех отправленных сообщений.
     """
+    logger.info(f"[SENDER] send_content_to_group: type={message.content_type}, chat_id={chat_id}, thread_id={thread_id}, suffix_len={len(suffix)}")
+
     def add_thread(kwargs: dict):
         if thread_id is not None:
             kwargs["message_thread_id"] = int(thread_id)
@@ -69,80 +72,102 @@ async def send_content_to_group(
 
     base_text = (message.caption or message.text or "") + (suffix or "")
     sent_messages: list[Message] = []
+    has_media = bool(message.photo or message.video or message.document or message.audio or message.voice or message.animation or message.sticker or message.video_note)
 
-    # Фото / Видео / Документы / Аудио / Голос
-    if message.photo or message.video or message.document or message.audio or message.voice:
-        parts = split_text(base_text, MAX_CAPTION)
-        for idx, chunk in enumerate(parts):
-            chunk_entities = slice_entities(message.caption_entities, idx*MAX_CAPTION, (idx+1)*MAX_CAPTION)
+    try:
+        # Fallback на copy_message для коротких/простых (сохраняет оригинал, быстрее)
+        limit = MAX_CAPTION if has_media else MAX_TEXT
+        if len(base_text) <= limit and not message.poll and not message.media_group_id:  # Не для опросов/альбомов
+            sent = await bot.copy_message(
+                chat_id=chat_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id,
+                caption=base_text if has_media else None,  # Override caption для медиа
+                parse_mode=None,  # Сохраняем оригинальное форматирование
+                **add_thread({})
+            )
+            sent_messages.append(sent)
+            logger.info("[SENDER] Использован copy_message")
+            return sent_messages
+    except TelegramBadRequest as e:
+        logger.warning(f"[SENDER] copy_message failed: {e}, fallback на manual")
 
-            if idx == 0:
-                if message.photo:
-                    sent = await bot.send_photo(
-                        chat_id=chat_id,
-                        photo=message.photo[-1].file_id,
-                        caption=chunk,
-                        caption_entities=chunk_entities,
-                        **add_thread({})
-                    )
-                elif message.video:
-                    sent = await bot.send_video(
-                        chat_id=chat_id,
-                        video=message.video.file_id,
-                        caption=chunk,
-                        caption_entities=chunk_entities,
-                        **add_thread({})
-                    )
-                elif message.document:
-                    sent = await bot.send_document(
-                        chat_id=chat_id,
-                        document=message.document.file_id,
-                        caption=chunk,
-                        caption_entities=chunk_entities,
-                        **add_thread({})
-                    )
-                elif message.audio:
-                    sent = await bot.send_audio(
-                        chat_id=chat_id,
-                        audio=message.audio.file_id,
-                        caption=chunk,
-                        caption_entities=chunk_entities,
-                        **add_thread({})
-                    )
-                elif message.voice:
-                    sent = await bot.send_voice(
-                        chat_id=chat_id,
-                        voice=message.voice.file_id,
-                        caption=chunk,
-                        caption_entities=chunk_entities,
-                        **add_thread({})
-                    )
+    # Manual для длинных или специальных
+    try:
+        if has_media:
+            parts = split_text(base_text, MAX_CAPTION)
+            entities = message.caption_entities or message.entities or []
+            for idx, chunk in enumerate(parts):
+                chunk_entities = slice_entities(entities, idx * MAX_CAPTION, (idx + 1) * MAX_CAPTION)
+                kwargs = add_thread({"caption": chunk, "caption_entities": chunk_entities})
+
+                if idx == 0:
+                    if message.photo:
+                        sent = await bot.send_photo(chat_id=chat_id, photo=message.photo[-1].file_id, **kwargs)
+                    elif message.video:
+                        sent = await bot.send_video(chat_id=chat_id, video=message.video.file_id, **kwargs)
+                    elif message.document:
+                        sent = await bot.send_document(chat_id=chat_id, document=message.document.file_id, **kwargs)
+                    elif message.audio:
+                        sent = await bot.send_audio(chat_id=chat_id, audio=message.audio.file_id, **kwargs)
+                    elif message.voice:
+                        sent = await bot.send_voice(chat_id=chat_id, voice=message.voice.file_id, **kwargs)
+                    elif message.animation:
+                        sent = await bot.send_animation(chat_id=chat_id, animation=message.animation.file_id, **kwargs)
+                    elif message.sticker:
+                        sent = await bot.send_sticker(chat_id=chat_id, sticker=message.sticker.file_id, **add_thread({}))
+                        if chunk:  # Suffix/text отдельно, если есть
+                            extra = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
+                            sent_messages.append(extra)
+                    elif message.video_note:
+                        sent = await bot.send_video_note(chat_id=chat_id, video_note=message.video_note.file_id, **add_thread({}))
+                        if chunk:
+                            extra = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
+                            sent_messages.append(extra)
+                    else:
+                        sent = None
                 else:
-                    sent = None
+                    sent = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
 
                 if sent:
                     sent_messages.append(sent)
 
-            else:
-                sent = await bot.send_message(
-                    chat_id=chat_id,
-                    text=chunk,
-                    entities=chunk_entities,
-                    **add_thread({})
-                )
+        elif message.text:
+            parts = split_text(base_text, MAX_TEXT)
+            for idx, chunk in enumerate(parts):
+                chunk_entities = slice_entities(message.entities or [], idx * MAX_TEXT, (idx + 1) * MAX_TEXT)
+                sent = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
                 sent_messages.append(sent)
 
-    # Чистый текст
-    elif message.text:
-        parts = split_text(base_text, MAX_TEXT)
-        for idx, chunk in enumerate(parts):
-            chunk_entities = slice_entities(message.entities, idx*MAX_TEXT, (idx+1)*MAX_TEXT)
-            sent = await bot.send_message(
+        elif message.poll:
+            question = message.poll.question + (suffix or "")
+            sent = await bot.send_poll(
                 chat_id=chat_id,
-                text=chunk,
-                entities=chunk_entities,
+                question=question[:300],  # Лимит
+                options=[opt.text for opt in message.poll.options],
+                is_anonymous=message.poll.is_anonymous,
+                type=message.poll.type,
+                allows_multiple_answers=message.poll.allows_multiple_answers,
                 **add_thread({})
             )
             sent_messages.append(sent)
+
+        else:  # Fallback для других (location, contact, etc.)
+            sent = await bot.copy_message(
+                chat_id=chat_id,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id,
+                **add_thread({})
+            )
+            sent_messages.append(sent)
+            if suffix:
+                extra = await bot.send_message(chat_id=chat_id, text=suffix, **add_thread({}))
+                sent_messages.append(extra)
+
+    except Exception as e:
+        logger.error(f"[SENDER] Manual send failed: {e}")
+
+    if not sent_messages:
+        logger.warning("[SENDER] Нет отправленных сообщений")
 
     return sent_messages

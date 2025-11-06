@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 import asyncio
 
 from utils.sender import send_content_to_group
+from utils.topics import resolve_topic_id_by_keywords
 
 router = Router()
 logger = get_logger("moderation")
@@ -216,7 +217,10 @@ async def cmd_send_to_pro_group(message: Message):
 
 async def send_to_pro_group(message: Message):
     try:
-        tid = MEDPHYSPRO_GROUP_TOPIC_ID if MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0 else None
+        # Добавлено: Определяем thread_id по ключевым словам, как в новостях
+        tid = resolve_topic_id_by_keywords(message.reply_to_message)
+        if tid is None and MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0:
+            tid = MEDPHYSPRO_GROUP_TOPIC_ID  # Fallback на дефолтный, если ключевых слов нет
         suffix = ""  # Или другой, если нужно
         logger.info(f"[MOD] send_to_pro_group: tid={tid}, suffix='{suffix}', reply_type={message.reply_to_message.content_type}")
 

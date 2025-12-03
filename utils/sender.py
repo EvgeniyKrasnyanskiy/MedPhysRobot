@@ -91,20 +91,37 @@ async def send_content_to_group(
                 sent_messages.append(extra)
             return sent_messages
 
-        # Fallback на copy_message для коротких/простых (сохраняет оригинал, быстрее)
+        # Оптимизированная отправка для коротких сообщений
         limit = MAX_CAPTION if has_media else MAX_TEXT
-        if len(base_text) <= limit and not message.poll and not message.media_group_id:  # Не для опросов/альбомов
-            sent = await bot.copy_message(
-                chat_id=chat_id,
-                from_chat_id=message.chat.id,
-                message_id=message.message_id,
-                caption=base_text if has_media else None,  # Override caption для медиа
-                parse_mode=None,  # Сохраняем оригинальное форматирование
-                **add_thread({})
-            )
-            sent_messages.append(sent)
-            logger.info("[SENDER] Использован copy_message")
-            return sent_messages
+        if len(base_text) <= limit and not message.poll and not message.media_group_id:
+            # Для медиа: используем copy_message с caption_entities
+            if has_media:
+                sent = await bot.copy_message(
+                    chat_id=chat_id,
+                    from_chat_id=message.chat.id,
+                    message_id=message.message_id,
+                    caption=base_text,
+                    caption_entities=message.caption_entities,  # ✅ Сохраняем ссылки/форматирование!
+                    parse_mode=None,
+                    **add_thread({})
+                )
+                sent_messages.append(sent)
+                logger.info("[SENDER] Использован copy_message (media)")
+                return sent_messages
+            
+            # Для текста: copy_message не может менять текст, используем send_message
+            elif message.text:
+                sent = await bot.send_message(
+                    chat_id=chat_id,
+                    text=base_text,
+                    entities=message.entities,  # ✅ Сохраняем ссылки/форматирование!
+                    parse_mode=None,
+                    **add_thread({})
+                )
+                sent_messages.append(sent)
+                logger.info("[SENDER] Использован send_message (text)")
+                return sent_messages
+
     except TelegramBadRequest as e:
         logger.warning(f"[SENDER] copy_message failed: {e}, fallback на manual")
 

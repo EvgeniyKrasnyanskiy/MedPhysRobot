@@ -1,5 +1,6 @@
 # handlers/relay.py
 
+import html
 from aiogram import Router, F, Bot
 from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio, User
 
@@ -14,7 +15,7 @@ logger = get_logger("relay")
 logger.info("[RELAY] relay.py загружен")
 
 def format_caption(user: User, original: str = "") -> str:
-    name = f'<a href="tg://user?id={user.id}">{user.full_name}</a>'
+    name = f'<a href="tg://user?id={user.id}">{html.escape(user.full_name)}</a>'
     header = f"📨 Сообщение от {name} \n(user_id: <code>{user.id}</code>) ⬇️"
     if original:
         return f"{header}\n\n{original}"
@@ -26,35 +27,35 @@ async def relay_content(message: Message, bot: Bot) -> Message | None:
             chat_id=ADMIN_GROUP_ID,
             photo=message.photo[-1].file_id,
             caption=message.caption or "",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
     elif message.video:
         return await bot.send_video(
             chat_id=ADMIN_GROUP_ID,
             video=message.video.file_id,
             caption=message.caption or "",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
     elif message.document:
         return await bot.send_document(
             chat_id=ADMIN_GROUP_ID,
             document=message.document.file_id,
             caption=message.caption or "",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
     elif message.audio:
         return await bot.send_audio(
             chat_id=ADMIN_GROUP_ID,
             audio=message.audio.file_id,
             caption=message.caption or "",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
     elif message.voice:
         return await bot.send_voice(
             chat_id=ADMIN_GROUP_ID,
             voice=message.voice.file_id,
             caption=message.caption or "",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
     elif message.location:
         return await bot.send_location(
@@ -79,7 +80,7 @@ async def relay_content(message: Message, bot: Bot) -> Message | None:
         return await bot.send_message(
             chat_id=ADMIN_GROUP_ID,
             text=message.text or message.caption or "",
-            parse_mode="HTML"
+            entities=message.entities or message.caption_entities
         )
 
 @router.message(F.chat.type == "private")
@@ -108,10 +109,11 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
             media = []
             for i, msg in enumerate(album):
                 caption = msg.caption if i == 0 else ""
+                caption_entities = msg.caption_entities if i == 0 else None
                 if msg.photo:
-                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, parse_mode="HTML"))
+                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, caption_entities=caption_entities))
                 elif msg.video:
-                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, parse_mode="HTML"))
+                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, caption_entities=caption_entities))
             sent = await bot.send_media_group(chat_id=ADMIN_GROUP_ID, media=media)
             save_mapping(sent[0].message_id, user.id, album[0].message_id)
             logger.info(f"[RELAY] Альбом от {user.id} ({user.full_name})")
@@ -158,25 +160,25 @@ async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = 
                     media.append(InputMediaPhoto(
                         media=msg.photo[-1].file_id,
                         caption=msg.caption or "",
-                        parse_mode="HTML"
+                        caption_entities=msg.caption_entities
                     ))
                 elif msg.video:
                     media.append(InputMediaVideo(
                         media=msg.video.file_id,
                         caption=msg.caption or "",
-                        parse_mode="HTML"
+                        caption_entities=msg.caption_entities
                     ))
                 elif msg.document:
                     media.append(InputMediaDocument(
                         media=msg.document.file_id,
                         caption=msg.caption or "",
-                        parse_mode="HTML"
+                        caption_entities=msg.caption_entities
                     ))
                 elif msg.audio:
                     media.append(InputMediaAudio(
                         media=msg.audio.file_id,
                         caption=msg.caption or "",
-                        parse_mode="HTML"
+                        caption_entities=msg.caption_entities
                     ))
             if media:
                 sent = await bot.send_media_group(chat_id=user_id, media=media)
@@ -193,37 +195,42 @@ async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = 
                 sent = await bot.send_message(
                     chat_id=user_id,
                     text=message.text,
-                    parse_mode="HTML"
+                    entities=message.entities
                 )
             elif message.photo:
                 sent = await bot.send_photo(
                     chat_id=user_id,
                     photo=message.photo[-1].file_id,
-                    caption=message.caption or ""
+                    caption=message.caption or "",
+                    caption_entities=message.caption_entities
                 )
             elif message.video:
                 sent = await bot.send_video(
                     chat_id=user_id,
                     video=message.video.file_id,
-                    caption=message.caption or ""
+                    caption=message.caption or "",
+                    caption_entities=message.caption_entities
                 )
             elif message.document:
                 sent = await bot.send_document(
                     chat_id=user_id,
                     document=message.document.file_id,
-                    caption=message.caption or ""
+                    caption=message.caption or "",
+                    caption_entities=message.caption_entities
                 )
             elif message.audio:
                 sent = await bot.send_audio(
                     chat_id=user_id,
                     audio=message.audio.file_id,
-                    caption=message.caption or ""
+                    caption=message.caption or "",
+                    caption_entities=message.caption_entities
                 )
             elif message.voice:
                 sent = await bot.send_voice(
                     chat_id=user_id,
                     voice=message.voice.file_id,
-                    caption=message.caption or ""
+                    caption=message.caption or "",
+                    caption_entities=message.caption_entities
                 )
             else:
                 logger.warning(f"[RELAY] Неизвестный тип сообщения: {message.content_type}")
@@ -251,14 +258,14 @@ async def handle_edited_private_message(message: Message, bot: Bot):
                 chat_id=ADMIN_GROUP_ID,
                 message_id=admin_msg_id,
                 caption=f"(отредактировано)\n{message.caption}",
-                parse_mode="HTML"
+                caption_entities=message.caption_entities
             )
         elif message.text:
             await bot.edit_message_text(
                 chat_id=ADMIN_GROUP_ID,
                 message_id=admin_msg_id,
                 text=f"(отредактировано)\n{message.text}",
-                parse_mode="HTML"
+                entities=message.entities
             )
         logger.info(f"[RELAY] Обновлено сообщение от {message.from_user.id}")
     except Exception as e:
@@ -278,14 +285,14 @@ async def handle_admin_edit(message: Message, bot: Bot):
                 chat_id=user_id,
                 message_id=user_msg_id,
                 caption=f"(отредактировано)\n{message.caption}",
-                parse_mode="HTML"
+                caption_entities=message.caption_entities
             )
         elif message.text:
             await bot.edit_message_text(
                 chat_id=user_id,
                 message_id=user_msg_id,
                 text=f"(отредактировано)\n{message.text}",
-                parse_mode="HTML"
+                entities=message.entities
             )
         logger.info(f"[RELAY] Редактированный ответ обновлён для пользователя {user_id}")
     except Exception as e:
@@ -306,7 +313,7 @@ async def handle_edited_album_caption(message: Message, bot: Bot):
             chat_id=ADMIN_GROUP_ID,
             message_id=admin_msg_id,
             caption=f"(отредактировано)\n{message.caption}",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
         logger.info(f"[RELAY] Обновлён caption альбома от {message.from_user.id}")
     except Exception as e:
@@ -328,7 +335,7 @@ async def handle_admin_album_edit(message: Message, bot: Bot):
             chat_id=user_id,
             message_id=user_msg_id,
             caption=f"(отредактировано)\n{message.caption}",
-            parse_mode="HTML"
+            caption_entities=message.caption_entities
         )
         logger.info(f"[RELAY] Обновлён caption альбома для пользователя {user_id}")
     except Exception as e:

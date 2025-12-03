@@ -1,5 +1,6 @@
 # handlers/moderation.py
 
+import html
 from aiogram import Router, F, Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
@@ -255,7 +256,7 @@ async def send_to_pro_group(message: Message):
                 f"🧵 thread_id: <code>{tid}</code>\n"
                 f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
                 f"📨 Новые msg_id: <code>{ids_str}</code>\n"
-                f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{message.from_user.full_name}</a>"
+                f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
             ),
             parse_mode="HTML"
         )

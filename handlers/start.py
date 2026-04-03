@@ -10,5 +10,13 @@ router = Router()
 
 @router.message(CommandStart())
 async def handle_start(message: Message):
-    await message.answer("👋 Теперь отправьте ваше сообщение. \nБот перешлёт его всем админам.")
+    await message.answer(
+        """👋 Теперь отправьте ваше сообщение.
+Бот перешлёт его всем администраторам.
+
+⚠️ Внимание!
+Telegram работает нестабильно.
+Если вам не ответили, пожалуйста,
+попытайтесь отправить сообщение позже."""
+    )
     logger.info(f"[START] Обрабатываю /start от {message.from_user.id}")

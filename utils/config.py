@@ -97,3 +97,13 @@ LOG_CHANNEL_ID = resolve_int_env("LOG_CHANNEL_ID", min_value=-10**13, default=-1
 
 # Путь к базе данных
 DB_PATH = get_env_var("DB_PATH", str, required=False, default=os.path.join("data", "medphysbot.db"))
+
+# Интервалы backoff при недоступности Telegram (прокси, блокировка, обрыв сети)
+_TELEGRAM_BO_MIN = float(
+    resolve_int_env("TELEGRAM_BACKOFF_MIN_SEC", min_value=1, default=2, allow_equal=True) or 2
+)
+_TELEGRAM_BO_MAX = float(resolve_int_env("TELEGRAM_BACKOFF_MAX_SEC", min_value=2, default=120) or 120)
+if _TELEGRAM_BO_MAX <= _TELEGRAM_BO_MIN:
+    _TELEGRAM_BO_MAX = _TELEGRAM_BO_MIN + 1.0
+TELEGRAM_BACKOFF_MIN_SEC = _TELEGRAM_BO_MIN
+TELEGRAM_BACKOFF_MAX_SEC = _TELEGRAM_BO_MAX

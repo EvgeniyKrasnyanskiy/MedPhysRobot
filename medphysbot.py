@@ -16,6 +16,7 @@ from utils.commands import setup_bot_commands
 
 from utils.logger import init_all_loggers, start_telegram_loggers, flush_telegram_loggers
 from utils.config import BOT_TOKEN, DEBUG_MODE
+from utils.telegram_connect import TELEGRAM_BACKOFF, run_with_network_retry, wait_for_bot_connection
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 
@@ -34,7 +35,12 @@ async def main():
         logger.error(f"Ошибка при инициализации БД: {e}")
         return
 
-    await setup_bot_commands(bot)
+    await wait_for_bot_connection(bot, logger)
+
+    async def _setup_commands():
+        await setup_bot_commands(bot)
+
+    await run_with_network_retry("Регистрация команд меню бота", _setup_commands, logger)
     dp = Dispatcher(storage=MemoryStorage())
 
     dp.include_router(moderation.router)
@@ -69,7 +75,7 @@ async def main():
     logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")
     logger.info("[STARTUP] Бот полностью готов")
 
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, backoff_config=TELEGRAM_BACKOFF)
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -23,16 +23,12 @@ def format_header(user: User) -> str:
 
 
 async def relay_content(message: Message, bot: Bot, header: str = "") -> List[Message]:
-    """Обертка над универсальным отправителем для релея."""
-    # Используем html_text для сохранения форматирования при объединении с заголовком
-    content_html = message.html_text if (message.text or message.caption) else ""
-    full_text = header + content_html
-    
+    """Forwards a single user message to the admin group with the relay header."""
     return await send_content_to_group(
         message=message,
         bot=bot,
         chat_id=ADMIN_GROUP_ID,
-        prefix=header,  # Мы передаем prefix для логов/отладки, но отправим через parse_mode
+        prefix=header,
         parse_mode="HTML"
     )
 

@@ -93,7 +93,15 @@ async def send_content_to_group(
 
     # Combine prefix, content and suffix
     if parse_mode == "HTML":
-        raw_content = message.html_text if (message.text or message.caption) else ""
+        # html_text only processes message.text (not caption!).
+        # For media messages, we must use caption + caption_entities.
+        from aiogram.utils.text_decorations import html_decoration
+        if message.text is not None:
+            raw_content = html_decoration.unparse(text=message.text, entities=message.entities or [])
+        elif message.caption is not None:
+            raw_content = html_decoration.unparse(text=message.caption, entities=message.caption_entities or [])
+        else:
+            raw_content = ""
         base_text = prefix + raw_content + (suffix or "")
         entities = None
     else:

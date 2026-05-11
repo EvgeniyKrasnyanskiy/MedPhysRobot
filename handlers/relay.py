@@ -82,7 +82,7 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
 
         # 📦 Всё остальное (единичные сообщения)
         else:
-            sent_list = await relay_content(message, bot, prefix=header)
+            sent_list = await relay_content(message, bot, header=header)
             if sent_list:
                 # Мапим первое сообщение из списка (обычно оно единственное)
                 save_mapping(sent_list[0].message_id, user.id, message.message_id)

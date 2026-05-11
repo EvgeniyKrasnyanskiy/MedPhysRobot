@@ -113,7 +113,10 @@ async def main() -> None:
             else:
                 logger.debug("[STARTUP] periodic_cleanup task already running — skip duplicate")
 
-            # 8. Final log synchronization before starting polling
+            # 8. Final log synchronization before starting polling.
+            # Give the event loop one full iteration so all pending _add_to_buffer
+            # tasks (created via create_task in emit()) can complete before we flush.
+            await asyncio.sleep(0.1)
             await flush_telegram_loggers()
             start_telegram_loggers()
 

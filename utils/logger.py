@@ -56,18 +56,26 @@ def get_logger(name: str) -> logging.Logger:
 
 def init_all_loggers(bot: Bot) -> None:
     """
-    Инициализация всех логгеров проекта + Telegram-хендлер.
+    Initialize all project loggers + Telegram handler.
+    On subsequent calls (e.g. after a network restart), only the bot reference
+    inside the existing handler is updated — the handler itself is NOT recreated.
+    This prevents the old handler from holding a reference to a closed bot session.
     """
     from utils.config import ENABLE_TELEGRAM_LOGGING, LOG_CHANNEL_ID
     global _telegram_handler
 
     if ENABLE_TELEGRAM_LOGGING and LOG_CHANNEL_ID != -1:
-        _telegram_handler = TelegramLogHandler(
-            bot=bot,
-            log_channel_id=LOG_CHANNEL_ID,
-            batch_size=1000,         # большой буфер для запуска
-            flush_interval=30        # автофлеш после старта
-        )
+        if _telegram_handler is not None:
+            # Just swap the bot reference so the handler uses the fresh session
+            _telegram_handler.bot = bot
+        else:
+            _telegram_handler = TelegramLogHandler(
+                bot=bot,
+                log_channel_id=LOG_CHANNEL_ID,
+                batch_size=200,          # flush after 200 entries (was 1000)
+                flush_interval=30,
+                max_buffer_size=500,     # deque hard cap: ~500 log lines max in RAM
+            )
 
     for name in [
         "bot", "topics", "db", "moderation", "relay", "news", "startup",

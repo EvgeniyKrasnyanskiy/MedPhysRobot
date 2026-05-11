@@ -2,6 +2,7 @@
 
 import logging
 import asyncio
+from collections import deque
 from aiogram import Bot
 
 from utils.config import DEBUG_MODE
@@ -12,13 +13,21 @@ if DEBUG_MODE:
 
 
 class TelegramLogHandler(logging.Handler):
-    def __init__(self, bot: Bot, log_channel_id: int, batch_size: int = 1000, flush_interval: int = 30):
+    def __init__(
+        self,
+        bot: Bot,
+        log_channel_id: int,
+        batch_size: int = 200,
+        flush_interval: int = 30,
+        max_buffer_size: int = 500,
+    ):
         super().__init__()
         self.bot = bot
         self.log_channel_id = log_channel_id
         self.batch_size = batch_size
         self.flush_interval = flush_interval
-        self.buffer = []
+        # deque with maxlen caps memory usage: oldest entries are auto-dropped on overflow
+        self.buffer: deque[str] = deque(maxlen=max_buffer_size)
         self.buffer_lock = asyncio.Lock()
         self._started = False
         self.auto_flush_enabled = False  # автофлеш отключён до старта
@@ -37,6 +46,7 @@ class TelegramLogHandler(logging.Handler):
 
     async def _add_to_buffer(self, entry: str):
         async with self.buffer_lock:
+            # deque auto-drops the oldest entry when maxlen is reached
             self.buffer.append(entry)
             if self.auto_flush_enabled and len(self.buffer) >= self.batch_size:
                 await self._flush()
@@ -47,8 +57,10 @@ class TelegramLogHandler(logging.Handler):
                 print("[LOGGER] flush: буфер пуст — ничего не отправляем")
             return
 
-        text = "\n".join(self.buffer)
+        # Snapshot and clear atomically; deque is mutable so we copy first
+        entries = list(self.buffer)
         self.buffer.clear()
+        text = "\n".join(entries)
 
         max_length = 4000
         chunks = [text[i:i + max_length] for i in range(0, len(text), max_length)]

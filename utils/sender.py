@@ -164,7 +164,11 @@ async def send_content_to_group(
             parts = split_text(base_text, MAX_CAPTION)
             for idx, chunk in enumerate(parts):
                 chunk_entities = slice_entities(entities, idx * MAX_CAPTION, (idx + 1) * MAX_CAPTION)
-                kwargs = add_thread({"caption": chunk, "caption_entities": chunk_entities})
+                kwargs = add_thread({
+                    "caption": chunk,
+                    "caption_entities": chunk_entities if not parse_mode else None,
+                    "parse_mode": parse_mode
+                })
 
                 if idx == 0:
                     if message.photo:
@@ -182,12 +186,24 @@ async def send_content_to_group(
                     elif message.sticker:
                         sent = await bot.send_sticker(chat_id=chat_id, sticker=message.sticker.file_id, **add_thread({}))
                         if chunk:  # Suffix/text отдельно, если есть
-                            extra = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
+                            extra = await bot.send_message(
+                                chat_id=chat_id,
+                                text=chunk,
+                                entities=chunk_entities if not parse_mode else None,
+                                parse_mode=parse_mode,
+                                **add_thread({})
+                            )
                             sent_messages.append(extra)
                     elif message.video_note:
                         sent = await bot.send_video_note(chat_id=chat_id, video_note=message.video_note.file_id, **add_thread({}))
                         if chunk:
-                            extra = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
+                            extra = await bot.send_message(
+                                chat_id=chat_id,
+                                text=chunk,
+                                entities=chunk_entities if not parse_mode else None,
+                                parse_mode=parse_mode,
+                                **add_thread({})
+                            )
                             sent_messages.append(extra)
                     else:
                         sent = None
@@ -201,7 +217,13 @@ async def send_content_to_group(
             parts = split_text(base_text, MAX_TEXT)
             for idx, chunk in enumerate(parts):
                 chunk_entities = slice_entities(entities, idx * MAX_TEXT, (idx + 1) * MAX_TEXT)
-                sent = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
+                sent = await bot.send_message(
+                    chat_id=chat_id,
+                    text=chunk,
+                    entities=chunk_entities if not parse_mode else None,
+                    parse_mode=parse_mode,
+                    **add_thread({})
+                )
                 sent_messages.append(sent)
 
         elif message.poll:
@@ -222,11 +244,18 @@ async def send_content_to_group(
                 chat_id=chat_id,
                 from_chat_id=message.chat.id,
                 message_id=message.message_id,
+                caption=base_text,
+                caption_entities=entities if not parse_mode else None,
+                parse_mode=parse_mode,
                 **add_thread({})
             )
             sent_messages.append(sent)
-            if suffix:
-                extra = await bot.send_message(chat_id=chat_id, text=suffix, **add_thread({}))
+            if suffix and not base_text.endswith(suffix): # Если суффикс еще не там
+                extra = await bot.send_message(
+                    chat_id=chat_id,
+                    text=suffix,
+                    **add_thread({})
+                )
                 sent_messages.append(extra)
 
     except Exception as e:

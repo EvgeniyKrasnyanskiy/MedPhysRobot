@@ -17,7 +17,7 @@ logger.info("[RELAY] relay.py загружен")
 
 def format_header(user: User) -> str:
     """Форматирует заголовок с данными пользователя для админ-группы."""
-    username = f" (@{user.username})" if user.username else ""
+    username = f" (@{html.escape(user.username)})" if user.username else ""
     name = f'<a href="tg://user?id={user.id}">{html.escape(user.full_name)}</a>'
     return f"📨 <b>Сообщение от {name}</b>{username}\nID: <code>{user.id}</code>\n\n"
 
@@ -55,14 +55,16 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
         if album:
             media = []
             for i, msg in enumerate(album):
-                # Используем html_text для сохранения форматирования внутри альбома
+                # Сохраняем оригинальный HTML-текст (caption) для каждого сообщения
                 msg_html = msg.html_text if (msg.text or msg.caption) else ""
-                caption = (header + msg_html) if i == 0 else ""
+                
+                # Добавляем заголовок релея только к ПЕРВОМУ сообщению альбома
+                current_caption = (header + msg_html) if i == 0 else msg_html
 
                 if msg.photo:
-                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, parse_mode="HTML"))
+                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=current_caption, parse_mode="HTML"))
                 elif msg.video:
-                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, parse_mode="HTML"))
+                    media.append(InputMediaVideo(media=msg.video.file_id, caption=current_caption, parse_mode="HTML"))
             
             sent = await bot.send_media_group(chat_id=ADMIN_GROUP_ID, media=media)
             save_mapping(sent[0].message_id, user.id, album[0].message_id)

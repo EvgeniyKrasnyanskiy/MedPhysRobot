@@ -27,7 +27,6 @@ async def main() -> None:
     # logging.getLogger always returns the same cached object from the registry,
     # so this line is safe to call before and after init_all_loggers().
     logger = logging.getLogger("bot")
-    proxy_url = "http://127.0.0.1:10808"
 
     # 1. One-time DB initialisation — outside the retry loop to avoid
     #    re-running expensive migrations on every network hiccup.
@@ -55,7 +54,7 @@ async def main() -> None:
         #    A new session is required after each network failure because the
         #    previous one may be in a broken state.
         # ------------------------------------------------------------------
-        session = AiohttpSession(proxy=proxy_url)
+        session = AiohttpSession()
         bot = Bot(
             token=BOT_TOKEN,
             session=session,
@@ -68,7 +67,7 @@ async def main() -> None:
             # reference so the handler always uses the live session.
             init_all_loggers(bot)
 
-            # 4. Wait until Telegram is reachable through the proxy.
+            # 4. Wait until Telegram is reachable.
             await wait_for_bot_connection(bot, logger)
 
             # 5. Register bot menu commands (with network retry).
@@ -122,7 +121,7 @@ async def main() -> None:
                 logger.debug("[STARTUP] periodic_cleanup task already running — skip duplicate")
 
             logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")
-            logger.info("[STARTUP] Бот полностью готов к работе через прокси")
+            logger.info("[STARTUP] Бот полностью готов к работе")
 
             # 8. Start polling.
             await dp.start_polling(bot, backoff_config=TELEGRAM_BACKOFF)

@@ -95,9 +95,6 @@ async def main() -> None:
             dp.include_router(thanks.router)
 
             # 7. Background tasks — start only once per process.
-            #    We track the task at module level (_cleanup_task) so that if
-            #    main() is ever re-entered the zombie task is detected and
-            #    replaced, not silently duplicated.
             global _cleanup_task
             if _cleanup_task is None or _cleanup_task.done():
                 async def periodic_cleanup():
@@ -110,20 +107,20 @@ async def main() -> None:
                             logger.error(f"[DB] Ошибка автоочисток: {exc}")
                         await asyncio.sleep(86400)
 
-                await flush_telegram_loggers()
-                start_telegram_loggers()
-
                 # Also kick off the TTL eviction loop (safe to call multiple times)
                 storage.start_eviction()
-
                 _cleanup_task = asyncio.create_task(periodic_cleanup(), name="periodic_db_cleanup")
             else:
                 logger.debug("[STARTUP] periodic_cleanup task already running — skip duplicate")
 
+            # 8. Final log synchronization before starting polling
+            await flush_telegram_loggers()
+            start_telegram_loggers()
+
             logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")
             logger.info("[STARTUP] Бот полностью готов к работе")
 
-            # 8. Start polling.
+            # 9. Start polling.
             await dp.start_polling(bot, backoff_config=TELEGRAM_BACKOFF)
 
             # Clean graceful exit (e.g. stop_polling() was called).

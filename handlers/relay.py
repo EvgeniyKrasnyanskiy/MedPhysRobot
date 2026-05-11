@@ -22,13 +22,18 @@ def format_header(user: User) -> str:
     return f"📨 <b>Сообщение от {name}</b>{username}\nID: <code>{user.id}</code>\n\n"
 
 
-async def relay_content(message: Message, bot: Bot, prefix: str = "") -> List[Message]:
+async def relay_content(message: Message, bot: Bot, header: str = "") -> List[Message]:
     """Обертка над универсальным отправителем для релея."""
+    # Используем html_text для сохранения форматирования при объединении с заголовком
+    content_html = message.html_text if (message.text or message.caption) else ""
+    full_text = header + content_html
+    
     return await send_content_to_group(
         message=message,
         bot=bot,
         chat_id=ADMIN_GROUP_ID,
-        prefix=prefix
+        prefix=header,  # Мы передаем prefix для логов/отладки, но отправим через parse_mode
+        parse_mode="HTML"
     )
 
 @router.message(F.chat.type == "private")
@@ -50,19 +55,14 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
         if album:
             media = []
             for i, msg in enumerate(album):
-                # Добавляем заголовок к первому элементу альбома
-                caption = (header + (msg.caption or "")) if i == 0 else ""
-                
-                # Смещаем entities для первого элемента
-                caption_entities = msg.caption_entities or []
-                if i == 0:
-                    from utils.sender import shift_entities
-                    caption_entities = shift_entities(caption_entities, len(header))
+                # Используем html_text для сохранения форматирования внутри альбома
+                msg_html = msg.html_text if (msg.text or msg.caption) else ""
+                caption = (header + msg_html) if i == 0 else ""
 
                 if msg.photo:
-                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, caption_entities=caption_entities, parse_mode=None))
+                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, parse_mode="HTML"))
                 elif msg.video:
-                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, caption_entities=caption_entities, parse_mode=None))
+                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, parse_mode="HTML"))
             
             sent = await bot.send_media_group(chat_id=ADMIN_GROUP_ID, media=media)
             save_mapping(sent[0].message_id, user.id, album[0].message_id)

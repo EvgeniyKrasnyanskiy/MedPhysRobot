@@ -75,7 +75,8 @@ async def send_content_to_group(
     chat_id: int,
     thread_id: int | None = None,
     prefix: str = "",
-    suffix: str = ""
+    suffix: str = "",
+    parse_mode: str | None = None
 ) -> list[Message]:
     """
     Универсальная пересылка сообщений в группу.
@@ -91,13 +92,17 @@ async def send_content_to_group(
         return kwargs
 
     # Combine prefix, content and suffix
-    raw_content = message.caption or message.text or ""
-    base_text = prefix + raw_content + (suffix or "")
-    
-    # Adjust entities for the prefix
-    entities = message.caption_entities or message.entities or []
-    if prefix:
-        entities = shift_entities(entities, len(prefix))
+    if parse_mode == "HTML":
+        raw_content = message.html_text if (message.text or message.caption) else ""
+        base_text = prefix + raw_content + (suffix or "")
+        entities = None
+    else:
+        raw_content = message.caption or message.text or ""
+        base_text = prefix + raw_content + (suffix or "")
+        # Adjust entities for the prefix
+        entities = message.caption_entities or message.entities or []
+        if prefix:
+            entities = shift_entities(entities, len(prefix))
 
     sent_messages: list[Message] = []
     has_media = bool(message.photo or message.video or message.document or message.audio or message.voice or message.animation or message.sticker or message.video_note)
@@ -129,8 +134,8 @@ async def send_content_to_group(
                     from_chat_id=message.chat.id,
                     message_id=message.message_id,
                     caption=base_text,
-                    caption_entities=entities,  # ✅ Now shifted!
-                    parse_mode=None,
+                    caption_entities=entities,
+                    parse_mode=parse_mode,
                     **add_thread({})
                 )
                 sent_messages.append(sent)
@@ -142,8 +147,8 @@ async def send_content_to_group(
                 sent = await bot.send_message(
                     chat_id=chat_id,
                     text=base_text,
-                    entities=entities,  # ✅ Now shifted!
-                    parse_mode=None,
+                    entities=entities,
+                    parse_mode=parse_mode,
                     **add_thread({})
                 )
                 sent_messages.append(sent)

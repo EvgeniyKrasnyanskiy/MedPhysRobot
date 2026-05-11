@@ -113,15 +113,16 @@ async def main() -> None:
             else:
                 logger.debug("[STARTUP] periodic_cleanup task already running — skip duplicate")
 
+            logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")
+            logger.info("[STARTUP] Бот полностью готов к работе")
+
             # 8. Final log synchronization before starting polling.
-            # Give the event loop one full iteration so all pending _add_to_buffer
-            # tasks (created via create_task in emit()) can complete before we flush.
+            # Log lines above are queued via create_task; sleep(0.1) lets the
+            # event loop drain all pending _add_to_buffer tasks so every startup
+            # log lands in the buffer before the single flush fires.
             await asyncio.sleep(0.1)
             await flush_telegram_loggers()
             start_telegram_loggers()
-
-            logger.info(f"Бот запущен в режиме DEBUG: {DEBUG_MODE}")
-            logger.info("[STARTUP] Бот полностью готов к работе")
 
             # 9. Start polling.
             await dp.start_polling(bot, backoff_config=TELEGRAM_BACKOFF)

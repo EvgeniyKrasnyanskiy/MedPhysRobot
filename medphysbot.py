@@ -105,7 +105,7 @@ async def main() -> None:
                         try:
                             cleanup_old_mappings(days=2)
                             news_monitor.cleanup_forwarded_news(days=7)
-                            logger.info("[DB] Периодическая очистка всех старых связей успешно завершена")
+                            logger.debug("[DB] Периодическая очистка всех старых связей успешно завершена")
                         except Exception as exc:
                             logger.error(f"[DB] Ошибка автоочисток: {exc}")
                         await asyncio.sleep(86400)

@@ -69,9 +69,10 @@ class TelegramLogHandler(logging.Handler):
 
         for chunk in chunks:
             try:
+                # Add [MedPhysBot] prefix to each chunk's header
                 await self.bot.send_message(
                     chat_id=self.log_channel_id,
-                    text=f"🧾 <b>Логи:</b>\n<pre>{chunk}</pre>",
+                    text=f"🧾 <b>[MedPhysBot] Логи:</b>\n<pre>{chunk}</pre>",
                     parse_mode="HTML"
                 )
                 if DEBUG_MODE:

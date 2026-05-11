@@ -9,79 +9,27 @@ from utils.config import ADMIN_GROUP_ID
 from utils.db import save_mapping, get_user_by_forwarded, is_banned, is_muted, get_admin_msg_id, get_user_reply_msg, \
     save_reply_mapping
 from utils.logger import get_logger
+from utils.sender import send_content_to_group
 
 router = Router()
 logger = get_logger("relay")
 logger.info("[RELAY] relay.py загружен")
 
-def format_caption(user: User, original: str = "") -> str:
+def format_header(user: User) -> str:
+    """Форматирует заголовок с данными пользователя для админ-группы."""
+    username = f" (@{user.username})" if user.username else ""
     name = f'<a href="tg://user?id={user.id}">{html.escape(user.full_name)}</a>'
-    header = f"📨 Сообщение от {name} \n(user_id: <code>{user.id}</code>) ⬇️"
-    if original:
-        return f"{header}\n\n{original}"
-    return header
+    return f"📨 <b>Сообщение от {name}</b>{username}\nID: <code>{user.id}</code>\n\n"
 
-async def relay_content(message: Message, bot: Bot) -> Message | None:
-    if message.photo:
-        return await bot.send_photo(
-            chat_id=ADMIN_GROUP_ID,
-            photo=message.photo[-1].file_id,
-            caption=message.caption or "",
-            caption_entities=message.caption_entities
-        )
-    elif message.video:
-        return await bot.send_video(
-            chat_id=ADMIN_GROUP_ID,
-            video=message.video.file_id,
-            caption=message.caption or "",
-            caption_entities=message.caption_entities
-        )
-    elif message.document:
-        return await bot.send_document(
-            chat_id=ADMIN_GROUP_ID,
-            document=message.document.file_id,
-            caption=message.caption or "",
-            caption_entities=message.caption_entities
-        )
-    elif message.audio:
-        return await bot.send_audio(
-            chat_id=ADMIN_GROUP_ID,
-            audio=message.audio.file_id,
-            caption=message.caption or "",
-            caption_entities=message.caption_entities
-        )
-    elif message.voice:
-        return await bot.send_voice(
-            chat_id=ADMIN_GROUP_ID,
-            voice=message.voice.file_id,
-            caption=message.caption or "",
-            caption_entities=message.caption_entities
-        )
-    elif message.location:
-        return await bot.send_location(
-            chat_id=ADMIN_GROUP_ID,
-            latitude=message.location.latitude,
-            longitude=message.location.longitude
-        )
-    elif message.contact:
-        return await bot.send_contact(
-            chat_id=ADMIN_GROUP_ID,
-            phone_number=message.contact.phone_number,
-            first_name=message.contact.first_name,
-            last_name=message.contact.last_name or "",
-            vcard=message.contact.vcard or None
-        )
-    elif message.sticker:
-        return await bot.send_sticker(
-            chat_id=ADMIN_GROUP_ID,
-            sticker=message.sticker.file_id
-        )
-    else:
-        return await bot.send_message(
-            chat_id=ADMIN_GROUP_ID,
-            text=message.text or message.caption or "",
-            entities=message.entities or message.caption_entities
-        )
+
+async def relay_content(message: Message, bot: Bot, prefix: str = "") -> List[Message]:
+    """Обертка над универсальным отправителем для релея."""
+    return await send_content_to_group(
+        message=message,
+        bot=bot,
+        chat_id=ADMIN_GROUP_ID,
+        prefix=prefix
+    )
 
 @router.message(F.chat.type == "private")
 async def handle_private_message(message: Message, bot: Bot, album: List[Message] = None):
@@ -96,30 +44,34 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
         return
 
     try:
-        # 📨 Сервисное сообщение
-        intro = await bot.send_message(
-            chat_id=ADMIN_GROUP_ID,
-            text=format_caption(user),
-            parse_mode="HTML"
-        )
-        save_mapping(intro.message_id, user.id, message.message_id)
+        header = format_header(user)
 
         # 🖼️ Альбом
         if album:
             media = []
             for i, msg in enumerate(album):
-                caption = msg.caption if i == 0 else ""
-                caption_entities = msg.caption_entities if i == 0 else None
+                # Добавляем заголовок к первому элементу альбома
+                caption = (header + (msg.caption or "")) if i == 0 else ""
+                
+                # Смещаем entities для первого элемента
+                caption_entities = msg.caption_entities or []
+                if i == 0:
+                    from utils.sender import shift_entities
+                    caption_entities = shift_entities(caption_entities, len(header))
+
                 if msg.photo:
-                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, caption_entities=caption_entities))
+                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption, caption_entities=caption_entities, parse_mode=None))
                 elif msg.video:
-                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, caption_entities=caption_entities))
+                    media.append(InputMediaVideo(media=msg.video.file_id, caption=caption, caption_entities=caption_entities, parse_mode=None))
+            
             sent = await bot.send_media_group(chat_id=ADMIN_GROUP_ID, media=media)
             save_mapping(sent[0].message_id, user.id, album[0].message_id)
             logger.info(f"[RELAY] Альбом от {user.id} ({user.full_name})")
 
         # 🔁 Пересланное сообщение
         elif message.forward_from_chat or message.forward_from:
+            # Сначала шлем заголовок, т.к. forward не позволяет менять текст
+            intro = await bot.send_message(chat_id=ADMIN_GROUP_ID, text=header, parse_mode="HTML")
             forwarded = await bot.forward_message(
                 chat_id=ADMIN_GROUP_ID,
                 from_chat_id=message.chat.id,
@@ -128,11 +80,12 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
             save_mapping(forwarded.message_id, user.id, message.message_id)
             logger.info(f"[RELAY] Переслано от {user.id} ({user.full_name})")
 
-        # 📦 Всё остальное
+        # 📦 Всё остальное (единичные сообщения)
         else:
-            sent = await relay_content(message, bot)
-            if sent:
-                save_mapping(sent.message_id, user.id, message.message_id)
+            sent_list = await relay_content(message, bot, prefix=header)
+            if sent_list:
+                # Мапим первое сообщение из списка (обычно оно единственное)
+                save_mapping(sent_list[0].message_id, user.id, message.message_id)
                 logger.info(f"[RELAY] Контент от {user.id} ({user.full_name})")
 
         await message.answer("✅ Ваше сообщение получено!")

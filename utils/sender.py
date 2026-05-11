@@ -50,11 +50,31 @@ def slice_entities(entities: list[MessageEntity] | None, start: int, end: int) -
             )
     return new_entities
 
+def shift_entities(entities: list[MessageEntity] | None, offset: int) -> list[MessageEntity]:
+    """Смещает все entities на заданный offset."""
+    if not entities or offset == 0:
+        return entities or []
+    
+    new_entities = []
+    for ent in entities:
+        new_entities.append(
+            MessageEntity(
+                type=ent.type,
+                offset=ent.offset + offset,
+                length=ent.length,
+                url=ent.url,
+                user=ent.user,
+                language=ent.language
+            )
+        )
+    return new_entities
+
 async def send_content_to_group(
     message: Message,
     bot: Bot,
     chat_id: int,
     thread_id: int | None = None,
+    prefix: str = "",
     suffix: str = ""
 ) -> list[Message]:
     """
@@ -70,7 +90,15 @@ async def send_content_to_group(
             kwargs["message_thread_id"] = int(thread_id)
         return kwargs
 
-    base_text = (message.caption or message.text or "") + (suffix or "")
+    # Combine prefix, content and suffix
+    raw_content = message.caption or message.text or ""
+    base_text = prefix + raw_content + (suffix or "")
+    
+    # Adjust entities for the prefix
+    entities = message.caption_entities or message.entities or []
+    if prefix:
+        entities = shift_entities(entities, len(prefix))
+
     sent_messages: list[Message] = []
     has_media = bool(message.photo or message.video or message.document or message.audio or message.voice or message.animation or message.sticker or message.video_note)
 
@@ -101,7 +129,7 @@ async def send_content_to_group(
                     from_chat_id=message.chat.id,
                     message_id=message.message_id,
                     caption=base_text,
-                    caption_entities=message.caption_entities,  # ✅ Сохраняем ссылки/форматирование!
+                    caption_entities=entities,  # ✅ Now shifted!
                     parse_mode=None,
                     **add_thread({})
                 )
@@ -114,7 +142,7 @@ async def send_content_to_group(
                 sent = await bot.send_message(
                     chat_id=chat_id,
                     text=base_text,
-                    entities=message.entities,  # ✅ Сохраняем ссылки/форматирование!
+                    entities=entities,  # ✅ Now shifted!
                     parse_mode=None,
                     **add_thread({})
                 )
@@ -129,7 +157,6 @@ async def send_content_to_group(
     try:
         if has_media:
             parts = split_text(base_text, MAX_CAPTION)
-            entities = message.caption_entities or message.entities or []
             for idx, chunk in enumerate(parts):
                 chunk_entities = slice_entities(entities, idx * MAX_CAPTION, (idx + 1) * MAX_CAPTION)
                 kwargs = add_thread({"caption": chunk, "caption_entities": chunk_entities})
@@ -168,7 +195,7 @@ async def send_content_to_group(
         elif message.text:
             parts = split_text(base_text, MAX_TEXT)
             for idx, chunk in enumerate(parts):
-                chunk_entities = slice_entities(message.entities or [], idx * MAX_TEXT, (idx + 1) * MAX_TEXT)
+                chunk_entities = slice_entities(entities, idx * MAX_TEXT, (idx + 1) * MAX_TEXT)
                 sent = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
                 sent_messages.append(sent)
 

@@ -221,4 +221,4 @@ def cleanup_old_mappings(days: int = 2):
         cursor.execute("DELETE FROM reply_map WHERE timestamp < ?", (cutoff,))
         conn.commit()
 
-    logger.info(f"[DB] Очистка связей: удалено всё старше {cutoff}")
+    logger.debug(f"[DB] Очистка связей: удалено всё старше {cutoff}")

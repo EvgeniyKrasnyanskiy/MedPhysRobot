@@ -183,4 +183,4 @@ def cleanup_forwarded_news(days: int = 7):
         deleted = cursor.rowcount
         conn.commit()
 
-    logger.info(f"[DB] Очистка новостей: удалено {deleted} записей старше {iso_threshold}")
+    logger.debug(f"[DB] Очистка новостей: удалено {deleted} записей старше {iso_threshold}")

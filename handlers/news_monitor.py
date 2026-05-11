@@ -17,18 +17,17 @@ logger = get_logger("news")  # ← вместо "news_monitor"
 logger.info("[NEWS_MONITOR] news_monitor.py загружен")
 
 def init_forwarded_news_table():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS forwarded_news (
-            message_id INTEGER PRIMARY KEY,
-            content_hash TEXT NOT NULL,
-            group_msg_id INTEGER,
-            forwarded_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS forwarded_news (
+                message_id INTEGER PRIMARY KEY,
+                content_hash TEXT NOT NULL,
+                group_msg_id INTEGER,
+                forwarded_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
 
 def hash_message_content(message: Message) -> str:
     content = (message.text or "") + (message.caption or "")
@@ -54,30 +53,27 @@ def hash_message_content(message: Message) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 def is_hash_already_forwarded(content_hash: str) -> bool:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM forwarded_news WHERE content_hash = ?", (content_hash,))
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM forwarded_news WHERE content_hash = ?", (content_hash,))
+        result = cursor.fetchone()
+        return result is not None
 
 def save_forwarded_news(message_id: int, content_hash: str, group_msg_id: int = None):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT OR REPLACE INTO forwarded_news (message_id, content_hash, group_msg_id)
-        VALUES (?, ?, ?)
-    """, (message_id, content_hash, group_msg_id))
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO forwarded_news (message_id, content_hash, group_msg_id)
+            VALUES (?, ?, ?)
+        """, (message_id, content_hash, group_msg_id))
+        conn.commit()
 
 def get_group_msg_id(message_id: int) -> int | None:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT group_msg_id FROM forwarded_news WHERE message_id = ?", (message_id,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else None
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT group_msg_id FROM forwarded_news WHERE message_id = ?", (message_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
 
 def contains_deleted_marker(text: str | None) -> bool:
     return text and "deleted" in text.lower()
@@ -181,11 +177,10 @@ def cleanup_forwarded_news(days: int = 7):
     threshold = datetime.now(timezone.utc) - timedelta(days=days)
     iso_threshold = threshold.isoformat()
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM forwarded_news WHERE forwarded_at < ?", (iso_threshold,))
-    deleted = cursor.rowcount
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM forwarded_news WHERE forwarded_at < ?", (iso_threshold,))
+        deleted = cursor.rowcount
+        conn.commit()
 
-    logger.info(f"[DB] Очистка пересланных сообщений в канал старше 7 дней: удалено {deleted} записей старше {iso_threshold}")
+    logger.info(f"[DB] Очистка новостей: удалено {deleted} записей старше {iso_threshold}")

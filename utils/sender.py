@@ -15,6 +15,10 @@ def split_text(text: str, limit: int) -> list[str]:
     """Разбивает текст на части по limit символов."""
     return [text[i:i+limit] for i in range(0, len(text), limit)]
 
+def utf16_len(s: str) -> int:
+    """Возвращает длину строки в единицах UTF-16 (как ожидает Telegram API)."""
+    return len(s.encode('utf-16-le')) // 2
+
 def slice_entities(entities: list[MessageEntity] | None, start: int, end: int) -> list[MessageEntity]:
     """Пересчитывает entities для куска текста [start, end)."""
     new_entities = []
@@ -73,9 +77,10 @@ async def send_content_to_group(
     message: Message,
     bot: Bot,
     chat_id: int,
-    thread_id: int | None = None,
     prefix: str = "",
+    prefix_entities: list[MessageEntity] | None = None,
     suffix: str = "",
+    thread_id: int | None = None,
     parse_mode: str | None = None
 ) -> list[Message]:
     """
@@ -91,26 +96,18 @@ async def send_content_to_group(
             kwargs["message_thread_id"] = int(thread_id)
         return kwargs
 
-    # Combine prefix, content and suffix
-    if parse_mode == "HTML":
-        # html_text only processes message.text (not caption!).
-        # For media messages, we must use caption + caption_entities.
-        from aiogram.utils.text_decorations import html_decoration
-        if message.text is not None:
-            raw_content = html_decoration.unparse(text=message.text, entities=message.entities or [])
-        elif message.caption is not None:
-            raw_content = html_decoration.unparse(text=message.caption, entities=message.caption_entities or [])
-        else:
-            raw_content = ""
-        base_text = prefix + raw_content + (suffix or "")
+    raw_content = message.caption or message.text or ""
+    base_text = prefix + raw_content + (suffix or "")
+    
+    # Adjust entities for the prefix using UTF-16 lengths
+    entities = prefix_entities or []
+    original_entities = message.caption_entities or message.entities or []
+    if original_entities:
+        offset = utf16_len(prefix)
+        entities.extend(shift_entities(original_entities, offset))
+        
+    if not entities:
         entities = None
-    else:
-        raw_content = message.caption or message.text or ""
-        base_text = prefix + raw_content + (suffix or "")
-        # Adjust entities for the prefix
-        entities = message.caption_entities or message.entities or []
-        if prefix:
-            entities = shift_entities(entities, len(prefix))
 
     sent_messages: list[Message] = []
     has_media = bool(message.photo or message.video or message.document or message.audio or message.voice or message.animation or message.sticker or message.video_note)

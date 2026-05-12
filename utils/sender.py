@@ -3,6 +3,7 @@
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message, MessageEntity, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio, InputMediaAnimation
+from aiogram.client.default import Default
 from utils.logger import get_logger
 
 logger = get_logger("sender")
@@ -96,17 +97,28 @@ async def send_content_to_group(
             kwargs["message_thread_id"] = int(thread_id)
         return kwargs
 
-    raw_content = message.caption or message.text or ""
+    raw_content = ""
+    if parse_mode == "HTML":
+        # Используем встроенный метод aiogram для получения HTML-разметки
+        # Он корректно обрабатывает и text, и caption.
+        raw_content = message.html_text or ""
+    else:
+        raw_content = message.caption or message.text or ""
+
     base_text = prefix + raw_content + (suffix or "")
     
-    # Adjust entities for the prefix using UTF-16 lengths
-    entities = prefix_entities or []
-    original_entities = message.caption_entities or message.entities or []
-    if original_entities:
-        offset = utf16_len(prefix)
-        entities.extend(shift_entities(original_entities, offset))
+    # Если мы НЕ в режиме HTML, используем ручное смещение entities
+    if parse_mode != "HTML":
+        entities = prefix_entities or []
+        original_entities = message.caption_entities or message.entities or []
+        if original_entities:
+            offset = utf16_len(prefix)
+            entities.extend(shift_entities(original_entities, offset))
         
-    if not entities:
+        if not entities:
+            entities = None
+    else:
+        # В режиме HTML сущности уже "зашиты" в текст
         entities = None
 
     sent_messages: list[Message] = []
@@ -130,8 +142,11 @@ async def send_content_to_group(
             return sent_messages
 
         # Оптимизированная отправка для коротких сообщений
+        # ВАЖНО: используем utf16_len для проверки лимитов Telegram
+        base_text_len = utf16_len(base_text)
         limit = MAX_CAPTION if has_media else MAX_TEXT
-        if len(base_text) <= limit and not message.poll and not message.media_group_id:
+        
+        if base_text_len <= limit and not message.poll and not message.media_group_id:
             # Для медиа: используем copy_message с caption_entities
             if has_media:
                 sent = await bot.copy_message(
@@ -140,7 +155,7 @@ async def send_content_to_group(
                     message_id=message.message_id,
                     caption=base_text,
                     caption_entities=entities,
-                    parse_mode=parse_mode,
+                    parse_mode=parse_mode, # Здесь должен быть None, чтобы работали entities
                     **add_thread({})
                 )
                 sent_messages.append(sent)
@@ -194,7 +209,7 @@ async def send_content_to_group(
                             extra = await bot.send_message(
                                 chat_id=chat_id,
                                 text=chunk,
-                                entities=chunk_entities if not parse_mode else None,
+                                entities=chunk_entities,
                                 parse_mode=parse_mode,
                                 **add_thread({})
                             )
@@ -205,7 +220,7 @@ async def send_content_to_group(
                             extra = await bot.send_message(
                                 chat_id=chat_id,
                                 text=chunk,
-                                entities=chunk_entities if not parse_mode else None,
+                                entities=chunk_entities,
                                 parse_mode=parse_mode,
                                 **add_thread({})
                             )
@@ -213,7 +228,13 @@ async def send_content_to_group(
                     else:
                         sent = None
                 else:
-                    sent = await bot.send_message(chat_id=chat_id, text=chunk, entities=chunk_entities, **add_thread({}))
+                    sent = await bot.send_message(
+                        chat_id=chat_id, 
+                        text=chunk, 
+                        entities=chunk_entities, 
+                        parse_mode=parse_mode,
+                        **add_thread({})
+                    )
 
                 if sent:
                     sent_messages.append(sent)

@@ -17,9 +17,9 @@ logger.info("[RELAY] relay.py загружен")
 
 from aiogram.utils.formatting import as_list, Text, Bold, TextLink, Code
 
-def format_header(user: User) -> tuple[str, list[MessageEntity]]:
-    """Форматирует заголовок с данными пользователя для админ-группы."""
-    username = f" (@{user.username})" if user.username else ""
+def format_header(user: User) -> str:
+    """Форматирует заголовок с данными пользователя для админ-группы в HTML."""
+    username = f" (@{html.escape(user.username)})" if user.username else ""
     header_content = as_list(
         Text("📨 "),
         Bold("Сообщение от ", TextLink(user.full_name, url=f"tg://user?id={user.id}")),
@@ -27,19 +27,17 @@ def format_header(user: User) -> tuple[str, list[MessageEntity]]:
         Code(str(user.id)),
         Text("\n\n")
     )
-    kwargs = header_content.as_kwargs()
-    return kwargs["text"], kwargs.get("entities", [])
+    return header_content.as_html()
 
 
-async def relay_content(message: Message, bot: Bot, header_text: str = "", header_entities: list[MessageEntity] = None) -> List[Message]:
+async def relay_content(message: Message, bot: Bot, header_html: str = "") -> List[Message]:
     """Forwards a single user message to the admin group with the relay header."""
     return await send_content_to_group(
         message=message,
         bot=bot,
         chat_id=ADMIN_GROUP_ID,
-        prefix=header_text,
-        prefix_entities=header_entities,
-        parse_mode=None
+        prefix=header_html,
+        parse_mode="HTML"
     )
 
 @router.message(F.chat.type == "private")
@@ -55,29 +53,24 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
         return
 
     try:
-        header_text, header_entities = format_header(user)
+        header_html = format_header(user)
 
         # 🖼️ Альбом
         if album:
             media = []
             for i, msg in enumerate(album):
-                # Извлекаем оригинальный текст и сущности
-                user_text = msg.caption or msg.text or ""
-                user_entities = msg.caption_entities or msg.entities or []
+                # Извлекаем оригинальный HTML-контент
+                user_html = msg.html_text or ""
                 
                 if i == 0:
-                    current_caption = header_text + user_text
-                    # Сдвигаем пользовательские сущности на длину заголовка в utf-16
-                    shifted = shift_entities(user_entities, utf16_len(header_text))
-                    current_entities = (header_entities or []) + shifted
+                    current_caption = header_html + user_html
                 else:
-                    current_caption = user_text
-                    current_entities = user_entities
+                    current_caption = user_html
 
                 if msg.photo:
-                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=current_caption, caption_entities=current_entities))
+                    media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=current_caption, parse_mode="HTML"))
                 elif msg.video:
-                    media.append(InputMediaVideo(media=msg.video.file_id, caption=current_caption, caption_entities=current_entities))
+                    media.append(InputMediaVideo(media=msg.video.file_id, caption=current_caption, parse_mode="HTML"))
             
             sent = await bot.send_media_group(chat_id=ADMIN_GROUP_ID, media=media)
             save_mapping(sent[0].message_id, user.id, album[0].message_id)
@@ -86,18 +79,17 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
         # 🔁 Пересланное сообщение
         elif message.forward_from_chat or message.forward_from:
             # Сначала шлем заголовок, т.к. forward не позволяет менять текст
-            intro = await bot.send_message(chat_id=ADMIN_GROUP_ID, text=header_text, entities=header_entities)
+            intro = await bot.send_message(chat_id=ADMIN_GROUP_ID, text=header_html, parse_mode="HTML")
             forwarded = await bot.forward_message(
                 chat_id=ADMIN_GROUP_ID,
                 from_chat_id=message.chat.id,
                 message_id=message.message_id
             )
             save_mapping(forwarded.message_id, user.id, message.message_id)
-            logger.info(f"[RELAY] Переслано от {user.id} ({user.full_name})")
 
         # 📦 Всё остальное (единичные сообщения)
         else:
-            sent_list = await relay_content(message, bot, header_text=header_text, header_entities=header_entities)
+            sent_list = await relay_content(message, bot, header_html=header_html)
             if sent_list:
                 # Мапим первое сообщение из списка (обычно оно единственное)
                 save_mapping(sent_list[0].message_id, user.id, message.message_id)

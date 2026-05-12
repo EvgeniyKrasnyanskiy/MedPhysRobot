@@ -82,7 +82,7 @@ async def send_content_to_group(
     prefix_entities: list[MessageEntity] | None = None,
     suffix: str = "",
     thread_id: int | None = None,
-    parse_mode: str | None = None
+    parse_mode: str | None = "HTML"
 ) -> list[Message]:
     """
     Универсальная пересылка сообщений в группу.

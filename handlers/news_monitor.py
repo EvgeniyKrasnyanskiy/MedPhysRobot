@@ -93,7 +93,7 @@ async def forward_news(message: Message, bot: Bot):
         return
 
     thread_id = resolve_topic_id_by_keywords(message)
-    suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
+    suffix = f"\n\nИсточник: @{html.escape(MEDPHYSPRO_CHANNEL_USERNAME)}"
 
     try:
         sent_messages = await send_content_to_group(  # Переименовал в sent_messages для ясности

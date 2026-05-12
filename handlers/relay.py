@@ -119,26 +119,26 @@ async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = 
                 if msg.photo:
                     media.append(InputMediaPhoto(
                         media=msg.photo[-1].file_id,
-                        caption=msg.caption or "",
-                        caption_entities=msg.caption_entities
+                        caption=msg.html_text or "",
+                        parse_mode="HTML"
                     ))
                 elif msg.video:
                     media.append(InputMediaVideo(
                         media=msg.video.file_id,
-                        caption=msg.caption or "",
-                        caption_entities=msg.caption_entities
+                        caption=msg.html_text or "",
+                        parse_mode="HTML"
                     ))
                 elif msg.document:
                     media.append(InputMediaDocument(
                         media=msg.document.file_id,
-                        caption=msg.caption or "",
-                        caption_entities=msg.caption_entities
+                        caption=msg.html_text or "",
+                        parse_mode="HTML"
                     ))
                 elif msg.audio:
                     media.append(InputMediaAudio(
                         media=msg.audio.file_id,
-                        caption=msg.caption or "",
-                        caption_entities=msg.caption_entities
+                        caption=msg.html_text or "",
+                        parse_mode="HTML"
                     ))
             if media:
                 sent = await bot.send_media_group(chat_id=user_id, media=media)
@@ -154,47 +154,67 @@ async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = 
             if message.text:
                 sent = await bot.send_message(
                     chat_id=user_id,
-                    text=message.text,
-                    entities=message.entities
+                    text=message.html_text,
+                    parse_mode="HTML"
                 )
             elif message.photo:
                 sent = await bot.send_photo(
                     chat_id=user_id,
                     photo=message.photo[-1].file_id,
-                    caption=message.caption or "",
-                    caption_entities=message.caption_entities
+                    caption=message.html_text,
+                    parse_mode="HTML"
                 )
             elif message.video:
                 sent = await bot.send_video(
                     chat_id=user_id,
                     video=message.video.file_id,
-                    caption=message.caption or "",
-                    caption_entities=message.caption_entities
+                    caption=message.html_text,
+                    parse_mode="HTML"
                 )
             elif message.document:
                 sent = await bot.send_document(
                     chat_id=user_id,
                     document=message.document.file_id,
-                    caption=message.caption or "",
-                    caption_entities=message.caption_entities
+                    caption=message.html_text,
+                    parse_mode="HTML"
                 )
             elif message.audio:
                 sent = await bot.send_audio(
                     chat_id=user_id,
                     audio=message.audio.file_id,
-                    caption=message.caption or "",
-                    caption_entities=message.caption_entities
+                    caption=message.html_text,
+                    parse_mode="HTML"
                 )
             elif message.voice:
                 sent = await bot.send_voice(
                     chat_id=user_id,
                     voice=message.voice.file_id,
-                    caption=message.caption or "",
-                    caption_entities=message.caption_entities
+                    caption=message.html_text,
+                    parse_mode="HTML"
+                )
+            elif message.animation:
+                sent = await bot.send_animation(
+                    chat_id=user_id,
+                    animation=message.animation.file_id,
+                    caption=message.html_text,
+                    parse_mode="HTML"
+                )
+            elif message.sticker:
+                sent = await bot.send_sticker(
+                    chat_id=user_id,
+                    sticker=message.sticker.file_id
+                )
+            elif message.video_note:
+                sent = await bot.send_video_note(
+                    chat_id=user_id,
+                    video_note=message.video_note.file_id
                 )
             else:
-                logger.warning(f"[RELAY] Неизвестный тип сообщения: {message.content_type}")
-                return
+                sent = await bot.copy_message(
+                    chat_id=user_id,
+                    from_chat_id=message.chat.id,
+                    message_id=message.message_id
+                )
 
             save_reply_mapping(admin_msg_id=message.message_id,
                                user_id=user_id,
@@ -217,15 +237,15 @@ async def handle_edited_private_message(message: Message, bot: Bot):
             await bot.edit_message_caption(
                 chat_id=ADMIN_GROUP_ID,
                 message_id=admin_msg_id,
-                caption=f"(отредактировано)\n{message.caption}",
-                caption_entities=message.caption_entities
+                caption=f"(отредактировано)\n{message.html_text}",
+                parse_mode="HTML"
             )
         elif message.text:
             await bot.edit_message_text(
                 chat_id=ADMIN_GROUP_ID,
                 message_id=admin_msg_id,
-                text=f"(отредактировано)\n{message.text}",
-                entities=message.entities
+                text=f"(отредактировано)\n{message.html_text}",
+                parse_mode="HTML"
             )
         logger.info(f"[RELAY] Обновлено сообщение от {message.from_user.id}")
     except Exception as e:

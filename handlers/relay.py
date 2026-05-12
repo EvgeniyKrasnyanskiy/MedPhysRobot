@@ -2,14 +2,14 @@
 
 import html
 from aiogram import Router, F, Bot
-from aiogram.types import Message, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio, User
+from aiogram.types import Message, MessageEntity, InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio, User
 
 from typing import List
 from utils.config import ADMIN_GROUP_ID
 from utils.db import save_mapping, get_user_by_forwarded, is_banned, is_muted, get_admin_msg_id, get_user_reply_msg, \
     save_reply_mapping
 from utils.logger import get_logger
-from utils.sender import send_content_to_group
+from utils.sender import send_content_to_group, shift_entities, utf16_len
 
 router = Router()
 logger = get_logger("relay")
@@ -67,8 +67,6 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
                 
                 if i == 0:
                     current_caption = header_text + user_text
-                    
-                    from utils.sender import shift_entities, utf16_len
                     # Сдвигаем пользовательские сущности на длину заголовка в utf-16
                     shifted = shift_entities(user_entities, utf16_len(header_text))
                     current_entities = (header_entities or []) + shifted

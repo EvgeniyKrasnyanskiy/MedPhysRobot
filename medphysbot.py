@@ -32,7 +32,7 @@ async def main() -> None:
     #    re-running expensive migrations on every network hiccup.
     try:
         init_db()
-        cleanup_old_mappings(days=2)
+        cleanup_old_mappings(days=14)
 
         # news_monitor import is deferred to main() below, but cleanup_forwarded_news
         # is needed here before polling starts — import it directly.
@@ -100,7 +100,7 @@ async def main() -> None:
                 async def periodic_cleanup():
                     while True:
                         try:
-                            cleanup_old_mappings(days=2)
+                            cleanup_old_mappings(days=14)
                             news_monitor.cleanup_forwarded_news(days=7)
                             logger.debug("[DB] Периодическая очистка всех старых связей успешно завершена")
                         except Exception as exc:

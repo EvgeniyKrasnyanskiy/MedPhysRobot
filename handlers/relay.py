@@ -109,6 +109,7 @@ async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = 
 
     if not user_id:
         logger.warning(f"[RELAY] Не найден user_id для forwarded_id={forwarded_id}")
+        await message.reply("⚠️ Не удалось найти пользователя для ответа. Возможно, сообщение слишком старое (более 14 дней).")
         return
 
     try:
@@ -230,6 +231,10 @@ async def handle_edited_private_message(message: Message, bot: Bot):
     admin_msg_id = get_admin_msg_id(message.from_user.id, message.message_id)
     if not admin_msg_id:
         logger.warning(f"[RELAY] Нет admin_msg_id для user_id={message.from_user.id}, msg_id={message.message_id}")
+        try:
+            await message.reply("⚠️ К сожалению, это сообщение слишком старое (или связь была очищена), и я не могу синхронизировать правки.")
+        except:
+            pass
         return
 
     try:
@@ -256,6 +261,7 @@ async def handle_admin_edit(message: Message, bot: Bot):
     result = get_user_reply_msg(message.message_id)
     if not result:
         logger.warning(f"[RELAY] Не найдено соответствие для admin_msg_id={message.message_id}")
+        await message.reply("⚠️ Не удалось найти пользователя для ответа. Возможно, сообщение слишком старое (более 14 дней).")
         return
 
     user_id, user_msg_id = result
@@ -264,15 +270,15 @@ async def handle_admin_edit(message: Message, bot: Bot):
             await bot.edit_message_caption(
                 chat_id=user_id,
                 message_id=user_msg_id,
-                caption=f"(отредактировано)\n{message.caption}",
-                caption_entities=message.caption_entities
+                caption=f"(отредактировано)\n{message.html_text}",
+                parse_mode="HTML"
             )
         elif message.text:
             await bot.edit_message_text(
                 chat_id=user_id,
                 message_id=user_msg_id,
-                text=f"(отредактировано)\n{message.text}",
-                entities=message.entities
+                text=f"(отредактировано)\n{message.html_text}",
+                parse_mode="HTML"
             )
         logger.info(f"[RELAY] Редактированный ответ обновлён для пользователя {user_id}")
     except Exception as e:
@@ -286,6 +292,10 @@ async def handle_edited_album_caption(message: Message, bot: Bot):
     admin_msg_id = get_admin_msg_id(message.from_user.id, message.message_id)
     if not admin_msg_id:
         logger.warning(f"[RELAY] Нет admin_msg_id для альбома user_id={message.from_user.id}, msg_id={message.message_id}")
+        try:
+            await message.reply("⚠️ К сожалению, это сообщение слишком старое, и я не могу синхронизировать правки альбома.")
+        except:
+            pass
         return
 
     try:

@@ -302,8 +302,8 @@ async def handle_edited_album_caption(message: Message, bot: Bot):
         await bot.edit_message_caption(
             chat_id=ADMIN_GROUP_ID,
             message_id=admin_msg_id,
-            caption=f"(отредактировано)\n{message.caption}",
-            caption_entities=message.caption_entities
+            caption=f"(отредактировано)\n{message.html_text}",
+            parse_mode="HTML"
         )
         logger.info(f"[RELAY] Обновлён caption альбома от {message.from_user.id}")
     except Exception as e:
@@ -324,8 +324,8 @@ async def handle_admin_album_edit(message: Message, bot: Bot):
         await bot.edit_message_caption(
             chat_id=user_id,
             message_id=user_msg_id,
-            caption=f"(отредактировано)\n{message.caption}",
-            caption_entities=message.caption_entities
+            caption=f"(отредактировано)\n{message.html_text}",
+            parse_mode="HTML"
         )
         logger.info(f"[RELAY] Обновлён caption альбома для пользователя {user_id}")
     except Exception as e:

@@ -33,6 +33,7 @@ async def setup_bot_commands(bot: Bot):
     await bot.set_my_commands(
         commands=[
             BotCommand(command="send_to_pro_group", description="Переслать в PRO-группу"),
+            BotCommand(command="send_to_channel", description="Переслать в канал"),
             BotCommand(command="ban", description="Забанить пользователя"),
             BotCommand(command="unban", description="Разбанить пользователя"),
             BotCommand(command="mute", description="Выдать мут"),
@@ -42,4 +43,3 @@ async def setup_bot_commands(bot: Bot):
         ],
         scope=BotCommandScopeChat(chat_id=ADMIN_GROUP_ID)
     )
-

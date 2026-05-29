@@ -29,7 +29,7 @@ async def help_command(message: Message, bot: Bot):
     help_text += (
         "\n🛡️ <b>Модерация:</b>\n"
         "/ban — забанить навсегда\n"
-        "/mute — заглушить на 2 часа\n"
+        "/mute — заглушить (на время, например 30m, 2h)\n"
         "/unban — снять бан\n"
         "/unmute — снять заглушку\n"
         "/status — показать статус\n"

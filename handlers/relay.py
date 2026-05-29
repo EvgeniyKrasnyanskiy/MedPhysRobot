@@ -238,7 +238,7 @@ async def handle_edited_private_message(message: Message, bot: Bot):
         return
 
     try:
-        if message.caption and (message.photo or message.video or message.document):
+        if message.caption is not None and (message.photo or message.video or message.document):
             await bot.edit_message_caption(
                 chat_id=ADMIN_GROUP_ID,
                 message_id=admin_msg_id,
@@ -252,6 +252,9 @@ async def handle_edited_private_message(message: Message, bot: Bot):
                 text=f"(отредактировано)\n{message.html_text}",
                 parse_mode="HTML"
             )
+        else:
+            logger.warning(f"[RELAY] Не удалось обновить сообщение от {message.from_user.id}: нет text/caption")
+            return
         logger.info(f"[RELAY] Обновлено сообщение от {message.from_user.id}")
     except Exception as e:
         logger.error(f"[RELAY] Ошибка при обновлении сообщения: {e}")
@@ -266,7 +269,7 @@ async def handle_admin_edit(message: Message, bot: Bot):
 
     user_id, user_msg_id = result
     try:
-        if message.caption and (message.photo or message.video or message.document):
+        if message.caption is not None and (message.photo or message.video or message.document):
             await bot.edit_message_caption(
                 chat_id=user_id,
                 message_id=user_msg_id,
@@ -280,53 +283,10 @@ async def handle_admin_edit(message: Message, bot: Bot):
                 text=f"(отредактировано)\n{message.html_text}",
                 parse_mode="HTML"
             )
+        else:
+            logger.warning(f"[RELAY] Не удалось обновить ответ для {user_id}: нет text/caption")
+            return
         logger.info(f"[RELAY] Редактированный ответ обновлён для пользователя {user_id}")
     except Exception as e:
         logger.error(f"[RELAY] Ошибка редактирования ответа: {e}")
 
-@router.edited_message(F.chat.type == "private")
-async def handle_edited_album_caption(message: Message, bot: Bot):
-    if not message.caption:
-        return  # не редактировали caption — пропускаем
-
-    admin_msg_id = get_admin_msg_id(message.from_user.id, message.message_id)
-    if not admin_msg_id:
-        logger.warning(f"[RELAY] Нет admin_msg_id для альбома user_id={message.from_user.id}, msg_id={message.message_id}")
-        try:
-            await message.reply("⚠️ К сожалению, это сообщение слишком старое, и я не могу синхронизировать правки альбома.")
-        except:
-            pass
-        return
-
-    try:
-        await bot.edit_message_caption(
-            chat_id=ADMIN_GROUP_ID,
-            message_id=admin_msg_id,
-            caption=f"(отредактировано)\n{message.html_text}",
-            parse_mode="HTML"
-        )
-        logger.info(f"[RELAY] Обновлён caption альбома от {message.from_user.id}")
-    except Exception as e:
-        logger.error(f"[RELAY] Ошибка редактирования caption альбома: {e}")
-
-@router.edited_message(F.chat.id == ADMIN_GROUP_ID)
-async def handle_admin_album_edit(message: Message, bot: Bot):
-    if not message.caption:
-        return
-
-    result = get_user_reply_msg(message.message_id)
-    if not result:
-        logger.warning(f"[RELAY] Нет соответствия для admin_msg_id={message.message_id}")
-        return
-
-    user_id, user_msg_id = result
-    try:
-        await bot.edit_message_caption(
-            chat_id=user_id,
-            message_id=user_msg_id,
-            caption=f"(отредактировано)\n{message.html_text}",
-            parse_mode="HTML"
-        )
-        logger.info(f"[RELAY] Обновлён caption альбома для пользователя {user_id}")
-    except Exception as e:
-        logger.error(f"[RELAY] Ошибка редактирования caption альбома: {e}")

@@ -29,7 +29,7 @@ async def detect_thanks(message: Message):
         if any(word.startswith(thx) for thx in THANKS_WORDS)
     ]
 
-    emoji_hits = any(emoji in message.text for emoji in EMOJI_TRIGGERS)
+    emoji_hits = any(emoji in (message.text or "") for emoji in EMOJI_TRIGGERS)
 
     if fuzzy_hits or emoji_hits:
         target_user = message.reply_to_message.from_user

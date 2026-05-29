@@ -1,5 +1,6 @@
 # handlers/news_monitor.py
 
+import html
 import sqlite3
 import hashlib
 from datetime import timedelta, datetime, timezone
@@ -140,7 +141,7 @@ async def handle_edited_news(message: Message, bot: Bot):
             logger.error(f"[NEWS] Ошибка при удалении: {e}")
         return
 
-    suffix = f"\n\nИсточник: @{MEDPHYSPRO_CHANNEL_USERNAME}"
+    suffix = f"\n\nИсточник: @{html.escape(MEDPHYSPRO_CHANNEL_USERNAME)}"
 
     try:
         if message.text:

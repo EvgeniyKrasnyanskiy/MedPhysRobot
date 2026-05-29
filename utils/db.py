@@ -214,7 +214,7 @@ def get_user_status(user_id: int) -> dict:
     return status
 
 def cleanup_old_mappings(days: int = 2):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM relay_map WHERE timestamp < ?", (cutoff,))

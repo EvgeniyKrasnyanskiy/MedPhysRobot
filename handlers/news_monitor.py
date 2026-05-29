@@ -176,12 +176,12 @@ async def handle_edited_news(message: Message, bot: Bot):
 
 def cleanup_forwarded_news(days: int = 7):
     threshold = datetime.now(timezone.utc) - timedelta(days=days)
-    iso_threshold = threshold.isoformat()
+    db_threshold = threshold.strftime("%Y-%m-%d %H:%M:%S")
 
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM forwarded_news WHERE forwarded_at < ?", (iso_threshold,))
+        cursor.execute("DELETE FROM forwarded_news WHERE forwarded_at < ?", (db_threshold,))
         deleted = cursor.rowcount
         conn.commit()
 
-    logger.debug(f"[DB] Очистка новостей: удалено {deleted} записей старше {iso_threshold}")
+    logger.debug(f"[DB] Очистка новостей: удалено {deleted} записей старше {db_threshold}")

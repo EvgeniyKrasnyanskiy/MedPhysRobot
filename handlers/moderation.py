@@ -1,6 +1,7 @@
 # handlers/moderation.py
 
 import html
+import re
 from aiogram import Router, F, Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
@@ -56,6 +57,49 @@ async def reply_required(message: Message, command: str):
         logger.warning(f"[MOD] Не удалось удалить сообщения: {e}")
 
 
+def parse_mute_duration(text: str) -> timedelta | None:
+    """Парсит аргумент времени из текста сообщения команды.
+    Примеры:
+      /mute -> дефолт 2 часа
+      /mute 30m -> 30 минут
+      /mute 5h -> 5 часов
+      /mute 5 -> 5 часов (дефолтная единица при отсутствии суффикса)
+      /mute 2d -> 2 дня
+      /mute 1w -> 1 неделя
+    Если формат неверный, возвращает None.
+    """
+    if not text:
+        return timedelta(hours=2)
+        
+    parts = text.split(maxsplit=1)
+    if len(parts) < 2:
+        return timedelta(hours=2)
+        
+    arg = parts[1].strip().lower()
+    if not arg:
+        return timedelta(hours=2)
+
+    match = re.match(r"^(\d+)([mhdw])?$", arg)
+    if not match:
+        return None
+        
+    value = int(match.group(1))
+    unit = match.group(2)
+    
+    if not unit:
+        return timedelta(hours=value)
+    elif unit == 'm':
+        return timedelta(minutes=value)
+    elif unit == 'h':
+        return timedelta(hours=value)
+    elif unit == 'd':
+        return timedelta(days=value)
+    elif unit == 'w':
+        return timedelta(weeks=value)
+        
+    return None
+
+
 # 🔇 /mute
 @router.message(F.chat.id == ADMIN_GROUP_ID, Command("mute", ignore_mention=True, ignore_case=True))
 async def cmd_mute(message: Message, bot: Bot):
@@ -73,16 +117,29 @@ async def cmd_mute(message: Message, bot: Bot):
         await reply_required(message, "/mute")
         return
 
-    muted_until = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+    duration = parse_mute_duration(message.text)
+    if duration is None:
+        info = await message.reply("❗ Неверный формат времени. Используйте: `/mute [время][m/h/d/w]`, например `/mute 2h` или `/mute 30m`.")
+        await asyncio.sleep(5)
+        try:
+            await message.delete()
+            await info.delete()
+        except Exception as e:
+            logger.warning(f"[MOD] Не удалось удалить сообщения при ошибке mute: {e}")
+        return
+
+    muted_until = (datetime.now(timezone.utc) + duration).isoformat()
     mute_user(user_id, muted_until=muted_until)
 
-    logger.info(f"[MOD] Замьючен user_id={user_id} до {muted_until} UTC")
-    await message.reply(f"🔇 Пользователь {user_id} замьючен до {muted_until} UTC.")
+    duration_str = message.text.split(maxsplit=1)[1].strip() if len(message.text.split(maxsplit=1)) > 1 else "2h"
+    logger.info(f"[MOD] Замьючен user_id={user_id} до {muted_until} UTC (на {duration_str})")
+    await message.reply(f"🔇 Пользователь {user_id} замьючен до {muted_until} UTC (на {duration_str}).")
 
     try:
-        await bot.send_message(user_id, f"🔇 Вы были временно замьючены до {muted_until} UTC.")
+        await bot.send_message(user_id, f"🔇 Вы были временно замьючены до {muted_until} UTC (на {duration_str}).")
     except Exception as e:
         logger.warning(f"[MOD] Не удалось отправить уведомление user_id={user_id}: {e}")
+
 
 
 # 🔊 /unmute

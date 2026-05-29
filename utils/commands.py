@@ -36,7 +36,7 @@ async def setup_bot_commands(bot: Bot):
             BotCommand(command="send_to_channel", description="Переслать в канал"),
             BotCommand(command="ban", description="Забанить пользователя"),
             BotCommand(command="unban", description="Разбанить пользователя"),
-            BotCommand(command="mute", description="Выдать мут (время, например 2h, 30m)"),
+            BotCommand(command="mute", description="Выдать мут (1m, 2h, 3d)"),
             BotCommand(command="unmute", description="Снять мут"),
             BotCommand(command="status", description="Проверить ограничения"),
             BotCommand(command="help", description="Справка по командам"),

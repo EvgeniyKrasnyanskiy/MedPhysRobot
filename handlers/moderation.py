@@ -339,48 +339,136 @@ async def cmd_send_to_channel(message: Message):
         await reply_required(message, "/send_to_channel")
         return
 
-    await send_to_channel(message)
+    text_or_caption = message.text or message.caption or ""
+    parts = text_or_caption.split(maxsplit=1)
+    args = parts[1].strip() if len(parts) > 1 else ""
+
+    await send_to_channel(message, args)
 
 
-async def send_to_channel(message: Message):
-    try:
-        sent_messages = await send_content_to_group(
-            message=message.reply_to_message,
-            bot=message.bot,
-            chat_id=MEDPHYSPRO_CHANNEL_ID,
-        )
+def extract_message_id_from_link(text: str) -> int | None:
+    text = text.strip()
+    if not text:
+        return None
+    if text.isdigit():
+        return int(text)
+    match = re.search(r'(?:/|post=)(\d+)(?:\?|$)', text)
+    if match:
+        return int(match.group(1))
+    return None
 
-        if not sent_messages:
-            logger.warning("[MOD] Не удалось отправить через send_content, fallback на forward")
-            forwarded = await message.bot.forward_message(
-                chat_id=MEDPHYSPRO_CHANNEL_ID,
-                from_chat_id=message.reply_to_message.chat.id,
-                message_id=message.reply_to_message.message_id,
+
+def make_channel_post_link(chat_id: int, msg_id: int, username: str | None = None) -> str:
+    if username:
+        return f"https://t.me/{username.lstrip('@')}/{msg_id}"
+    clean_id = str(chat_id)
+    if clean_id.startswith("-100"):
+        clean_id = clean_id[4:]
+    elif clean_id.startswith("-"):
+        clean_id = clean_id[1:]
+    return f"https://t.me/c/{clean_id}/{msg_id}"
+
+
+async def send_to_channel(message: Message, args: str):
+    target_message_id = extract_message_id_from_link(args)
+
+    if target_message_id is not None:
+        # Режим редактирования существующего сообщения
+        try:
+            logger.info(f"[MOD] Попытка редактирования сообщения в канале: msg_id={target_message_id}, by={message.from_user.id}")
+
+            reply = message.reply_to_message
+            has_media = bool(
+                reply.photo or
+                reply.video or
+                reply.document or
+                reply.audio or
+                reply.animation
             )
-            sent_messages = [forwarded]
 
-        ids_str = ", ".join(str(m.message_id) for m in sent_messages)
-        logger.info(
-            f"[MOD] Переслано в канал: from_msg_id={message.reply_to_message.message_id}, "
-            f"to_msg_ids=[{ids_str}], by={message.from_user.id}"
-        )
+            new_text = reply.html_text or ""
 
-        await message.bot.send_message(
-            chat_id=LOG_CHANNEL_ID,
-            text=(
-                f"📢 <b>Переслано из админской группы в канал</b>\n"
-                f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
-                f"📨 Новые msg_id: <code>{ids_str}</code>\n"
-                f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
-            ),
-            parse_mode="HTML"
-        )
+            if has_media:
+                await message.bot.edit_message_caption(
+                    chat_id=MEDPHYSPRO_CHANNEL_ID,
+                    message_id=target_message_id,
+                    caption=new_text,
+                    parse_mode="HTML"
+                )
+            else:
+                await message.bot.edit_message_text(
+                    chat_id=MEDPHYSPRO_CHANNEL_ID,
+                    message_id=target_message_id,
+                    text=new_text,
+                    parse_mode="HTML"
+                )
 
-        await message.reply("✅ Сообщение отправлено в канал")
+            from utils.config import MEDPHYSPRO_CHANNEL_USERNAME
+            post_link = make_channel_post_link(MEDPHYSPRO_CHANNEL_ID, target_message_id, MEDPHYSPRO_CHANNEL_USERNAME)
 
-    except TelegramBadRequest as e:
-        logger.error(f"[MOD] Ошибка отправки в канал: {e}")
-        await message.reply(f"❌ Ошибка при пересылке в канал: {e.message}")
-    except Exception as e:
-        logger.error(f"[MOD] Неизвестная ошибка при отправке в канал: {e}")
-        await message.reply("❌ Неизвестная ошибка.")
+            await message.bot.send_message(
+                chat_id=LOG_CHANNEL_ID,
+                text=(
+                    f"📝 <b>Отредактировано сообщение в канале</b>\n"
+                    f"↪️ Исходное msg_id (реплай): <code>{message.reply_to_message.message_id}</code>\n"
+                    f"✏️ Сообщение в канале: <a href=\"{post_link}\">ID {target_message_id}</a>\n"
+                    f"👤 Редактор: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
+                ),
+                parse_mode="HTML"
+            )
+
+            await message.reply("✅ Сообщение в канале успешно отредактировано")
+
+        except TelegramBadRequest as e:
+            logger.error(f"[MOD] Ошибка редактирования в канале: {e}")
+            await message.reply(
+                f"❌ Не удалось отредактировать сообщение в канале: {e.message}\n"
+                f"Убедитесь, что сообщение было отправлено этим ботом и оно не слишком старое."
+            )
+        except Exception as e:
+            logger.error(f"[MOD] Неизвестная ошибка при редактировании в канале: {e}")
+            await message.reply("❌ Неизвестная ошибка при редактировании сообщения.")
+
+    else:
+        # Стандартный режим отправки нового сообщения
+        try:
+            sent_messages = await send_content_to_group(
+                message=message.reply_to_message,
+                bot=message.bot,
+                chat_id=MEDPHYSPRO_CHANNEL_ID,
+            )
+
+            if not sent_messages:
+                logger.warning("[MOD] Не удалось отправить через send_content, fallback на forward")
+                forwarded = await message.bot.forward_message(
+                    chat_id=MEDPHYSPRO_CHANNEL_ID,
+                    from_chat_id=message.reply_to_message.chat.id,
+                    message_id=message.reply_to_message.message_id,
+                )
+                sent_messages = [forwarded]
+
+            ids_str = ", ".join(str(m.message_id) for m in sent_messages)
+            logger.info(
+                f"[MOD] Переслано в канал: from_msg_id={message.reply_to_message.message_id}, "
+                f"to_msg_ids=[{ids_str}], by={message.from_user.id}"
+            )
+
+            await message.bot.send_message(
+                chat_id=LOG_CHANNEL_ID,
+                text=(
+                    f"📢 <b>Переслано из админской группы в канал</b>\n"
+                    f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
+                    f"📨 Новые msg_id: <code>{ids_str}</code>\n"
+                    f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
+                ),
+                parse_mode="HTML"
+            )
+
+            await message.reply("✅ Сообщение отправлено в канал")
+
+        except TelegramBadRequest as e:
+            logger.error(f"[MOD] Ошибка отправки в канал: {e}")
+            await message.reply(f"❌ Ошибка при пересылке в канал: {e.message}")
+        except Exception as e:
+            logger.error(f"[MOD] Неизвестная ошибка при отправке в канал: {e}")
+            await message.reply("❌ Неизвестная ошибка.")

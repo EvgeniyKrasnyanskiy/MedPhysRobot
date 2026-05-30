@@ -33,7 +33,7 @@ async def detect_thanks(message: Message):
 
     if fuzzy_hits or emoji_hits:
         target_user = message.reply_to_message.from_user
-        if target_user:
+        if target_user and not target_user.is_bot and target_user.id != message.from_user.id:
             increment_thanks(target_user.id, target_user.full_name)
             logger.info(
                 f"[THANKS] +1 для {target_user.full_name} ({target_user.id}) — "

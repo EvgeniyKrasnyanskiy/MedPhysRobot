@@ -18,6 +18,7 @@ async def setup_bot_commands(bot: Bot):
     await bot.set_my_commands(
         commands=[
             BotCommand(command="start", description="Запустить бота"),
+            BotCommand(command="help", description="Показать справку по командам"),
         ],
         scope=BotCommandScopeAllPrivateChats()
     )
@@ -33,7 +34,7 @@ async def setup_bot_commands(bot: Bot):
     await bot.set_my_commands(
         commands=[
             BotCommand(command="send_to_pro_group", description="Переслать в PRO-группу"),
-            BotCommand(command="send_to_channel", description="Переслать в канал"),
+            BotCommand(command="send_to_channel", description="Переслать в канал (или отредактировать: /send_to_channel [ссылка])"),
             BotCommand(command="ban", description="Забанить пользователя"),
             BotCommand(command="unban", description="Разбанить пользователя"),
             BotCommand(command="mute", description="Выдать мут (1m, 2h, 3d)"),

@@ -104,6 +104,10 @@ async def handle_private_message(message: Message, bot: Bot, album: List[Message
 
 @router.message(F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
 async def handle_group_reply(message: Message, bot: Bot, album: list[Message] = None):
+    # Ignore replies to messages not sent by the bot (e.g., admin-to-admin chat)
+    if not message.reply_to_message.from_user or message.reply_to_message.from_user.id != bot.id:
+        return
+
     forwarded_id = message.reply_to_message.message_id
     user_id = get_user_by_forwarded(forwarded_id)
 
@@ -261,6 +265,10 @@ async def handle_edited_private_message(message: Message, bot: Bot):
 
 @router.edited_message(F.chat.id == ADMIN_GROUP_ID)
 async def handle_admin_edit(message: Message, bot: Bot):
+    # Ignore edits if this message is not a reply to a bot message
+    if not message.reply_to_message or not message.reply_to_message.from_user or message.reply_to_message.from_user.id != bot.id:
+        return
+
     result = get_user_reply_msg(message.message_id)
     if not result:
         logger.warning(f"[RELAY] Не найдено соответствие для admin_msg_id={message.message_id}")

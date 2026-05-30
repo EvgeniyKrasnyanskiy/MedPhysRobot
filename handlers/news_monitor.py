@@ -145,24 +145,26 @@ async def handle_edited_news(message: Message, bot: Bot):
 
     try:
         if message.text:
-            text = message.text
+            text = message.html_text
             if suffix not in text:
                 text += suffix
 
             await bot.edit_message_text(
                 chat_id=MEDPHYSPRO_GROUP_ID,
                 message_id=group_msg_id,
-                text=text
+                text=text,
+                parse_mode="HTML"
             )
         elif message.caption:
-            caption = message.caption
+            caption = message.html_text
             if suffix not in caption:
                 caption += suffix
 
             await bot.edit_message_caption(
                 chat_id=MEDPHYSPRO_GROUP_ID,
                 message_id=group_msg_id,
-                caption=caption
+                caption=caption,
+                parse_mode="HTML"
             )
         else:
             logger.warning(f"[NEWS] Не удалось отредактировать: message_id={message.message_id} — нет текста или caption")

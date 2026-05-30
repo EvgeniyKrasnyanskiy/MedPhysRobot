@@ -10,3 +10,4 @@ venv/
 data/
 start_MedPhysRobot_cmd.bat
 start_MedPhysRobot_hide.bat
+.gemini/

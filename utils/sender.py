@@ -128,15 +128,18 @@ async def send_content_to_group(
         # Добавлено: Проверка на альбом (media group)
         if message.media_group_id:
             logger.info(f"[SENDER] Обнаружен альбом: media_group_id={message.media_group_id}")
-            # Для альбомов используем forward_message как fallback, т.к. разбиение не подходит
-            sent = await bot.forward_message(
+            # Используем copy_message для чистой отправки без плашки Forwarded
+            sent = await bot.copy_message(
                 chat_id=chat_id,
                 from_chat_id=message.chat.id,
                 message_id=message.message_id,
+                caption=base_text if utf16_len(base_text) <= MAX_CAPTION else None,
+                caption_entities=entities if utf16_len(base_text) <= MAX_CAPTION and not parse_mode else None,
+                parse_mode=parse_mode if utf16_len(base_text) <= MAX_CAPTION else None,
                 **add_thread({})
             )
             sent_messages.append(sent)
-            if suffix:
+            if suffix and (utf16_len(base_text) > MAX_CAPTION or not base_text.endswith(suffix)):
                 extra = await bot.send_message(chat_id=chat_id, text=suffix, **add_thread({}))
                 sent_messages.append(extra)
             return sent_messages

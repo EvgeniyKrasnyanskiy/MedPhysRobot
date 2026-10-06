@@ -296,14 +296,14 @@ async def send_to_pro_group(message: Message):
         )
 
         if not sent_messages:
-            logger.warning("[MOD] Не удалось переслать через send_content, fallback на forward")
-            forwarded = await message.bot.forward_message(
+            logger.warning("[MOD] Не удалось переслать через send_content, fallback на copy")
+            copied = await message.bot.copy_message(
                 chat_id=MEDPHYSPRO_GROUP_ID,
                 from_chat_id=message.reply_to_message.chat.id,
                 message_id=message.reply_to_message.message_id,
                 message_thread_id=tid
             )
-            sent_messages = [forwarded]
+            sent_messages = [copied]
 
         ids_str = ", ".join(str(m.message_id) for m in sent_messages)
         logger.info(
@@ -445,13 +445,13 @@ async def send_to_channel(message: Message, args: str):
             )
 
             if not sent_messages:
-                logger.warning("[MOD] Не удалось отправить через send_content, fallback на forward")
-                forwarded = await message.bot.forward_message(
+                logger.warning("[MOD] Не удалось отправить через send_content, fallback на copy")
+                copied = await message.bot.copy_message(
                     chat_id=MEDPHYSPRO_CHANNEL_ID,
                     from_chat_id=message.reply_to_message.chat.id,
                     message_id=message.reply_to_message.message_id,
                 )
-                sent_messages = [forwarded]
+                sent_messages = [copied]
 
             ids_str = ", ".join(str(m.message_id) for m in sent_messages)
             logger.info(

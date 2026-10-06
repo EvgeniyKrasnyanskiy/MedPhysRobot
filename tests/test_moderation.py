@@ -161,3 +161,22 @@ async def test_send_to_channel_edit_error():
     message.reply.assert_called_once()
     error_reply = message.reply.call_args[0][0]
     assert "❌ Не удалось отредактировать сообщение в канале" in error_reply
+
+
+def test_extract_user_id_from_reply_bot_protection(monkeypatch):
+    from handlers.moderation import extract_user_id_from_reply
+    
+    bot = MagicMock(spec=Bot)
+    bot.id = 999
+    
+    reply_msg = MagicMock(spec=Message, message_id=1234)
+    reply_msg.from_user = User(id=999, is_bot=True, first_name="Bot")
+    
+    msg = MagicMock(spec=Message)
+    msg.bot = bot
+    msg.reply_to_message = reply_msg
+    
+    monkeypatch.setattr("handlers.moderation.get_user_by_forwarded", lambda msg_id: None)
+    
+    # Must NOT return bot.id
+    assert extract_user_id_from_reply(msg) is None

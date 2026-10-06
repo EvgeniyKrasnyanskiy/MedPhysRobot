@@ -43,8 +43,13 @@ def extract_user_id_from_reply(message: Message) -> int | None:
     if mapped_id:
         return mapped_id
 
+    # Никогда не возвращаем ID самого бота (защита от бана/мьюта бота)
+    reply_user = message.reply_to_message.from_user
+    if reply_user and message.bot and reply_user.id == message.bot.id:
+        return None
+
     # Если пересылка не найдена — fallback на from_user.id
-    return message.reply_to_message.from_user.id
+    return reply_user.id if reply_user else None
 
 
 async def reply_required(message: Message, command: str):

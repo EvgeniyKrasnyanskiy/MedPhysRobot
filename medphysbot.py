@@ -85,7 +85,7 @@ async def main() -> None:
             from middlewares.album import AlbumMiddleware
 
             dp = Dispatcher(storage=storage)
-            dp.message.middleware(AlbumMiddleware())
+            dp.message.outer_middleware(AlbumMiddleware())
             dp.include_router(moderation.router)
             dp.include_router(start.router)
             dp.include_router(help.router)

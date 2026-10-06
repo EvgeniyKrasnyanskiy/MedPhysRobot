@@ -264,17 +264,17 @@ async def cmd_status(message: Message):
     await message.answer(f"✅ У пользователя {user_id} нет ограничений.")
 
 
-# ↪️ /send_to_pro_group
-@router.message(Command("send_to_pro_group"), F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
+# ↪️ /send_to_pro_group или /pro
+@router.message(Command("send_to_pro_group", "pro", ignore_mention=True, ignore_case=True), F.chat.id == ADMIN_GROUP_ID)
 async def cmd_send_to_pro_group(message: Message):
-    logger.info(f"[MOD] cmd_send_to_pro_group вызван: from_msg_id={message.reply_to_message.message_id}, by={message.from_user.id}")
     if message.chat.id != ADMIN_GROUP_ID:
         return
 
     if not message.reply_to_message:
-        await reply_required(message, "/send_to_pro_group")
+        await reply_required(message, "/pro")
         return
 
+    logger.info(f"[MOD] cmd_send_to_pro_group вызван: from_msg_id={message.reply_to_message.message_id}, by={message.from_user.id}")
     await send_to_pro_group(message)
 
 
@@ -333,16 +333,17 @@ async def send_to_pro_group(message: Message):
         await message.reply("❌ Неизвестная ошибка.")
 
 
-# 📢 /send_to_channel
-@router.message(Command("send_to_channel"), F.chat.id == ADMIN_GROUP_ID, F.reply_to_message)
+# 📢 /send_to_channel или /channel
+@router.message(Command("send_to_channel", "channel", ignore_mention=True, ignore_case=True), F.chat.id == ADMIN_GROUP_ID)
 async def cmd_send_to_channel(message: Message):
-    logger.info(f"[MOD] cmd_send_to_channel вызван: from_msg_id={message.reply_to_message.message_id}, by={message.from_user.id}")
     if message.chat.id != ADMIN_GROUP_ID:
         return
 
     if not message.reply_to_message:
-        await reply_required(message, "/send_to_channel")
+        await reply_required(message, "/channel")
         return
+
+    logger.info(f"[MOD] cmd_send_to_channel вызван: from_msg_id={message.reply_to_message.message_id}, by={message.from_user.id}")
 
     text_or_caption = message.text or message.caption or ""
     parts = text_or_caption.split(maxsplit=1)

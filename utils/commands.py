@@ -33,14 +33,16 @@ async def setup_bot_commands(bot: Bot):
     # Команды для всех групп (админы)
     await bot.set_my_commands(
         commands=[
-            BotCommand(command="send_to_pro_group", description="Переслать в PRO-группу"),
-            BotCommand(command="send_to_channel", description="Переслать в канал (или отредактировать: /send_to_channel [ссылка])"),
+            BotCommand(command="pro", description="Переслать в PRO-группу (быстро)"),
+            BotCommand(command="channel", description="В канал (или /channel [ссылка])"),
+            BotCommand(command="send_to_pro_group", description="Переслать в PRO-группу (полная)"),
+            BotCommand(command="send_to_channel", description="Переслать в канал (полная)"),
+            BotCommand(command="mute", description="Выдать мут (1m, 2h, 3d, 1w)"),
+            BotCommand(command="unmute", description="Снять мут"),
             BotCommand(command="ban", description="Забанить пользователя"),
             BotCommand(command="unban", description="Разбанить пользователя"),
-            BotCommand(command="mute", description="Выдать мут (1m, 2h, 3d)"),
-            BotCommand(command="unmute", description="Снять мут"),
-            BotCommand(command="status", description="Проверить ограничения"),
-            BotCommand(command="help", description="Справка по командам"),
+            BotCommand(command="status", description="Проверить статус пользователя"),
+            BotCommand(command="help", description="Подробная справка по функциям"),
         ],
         scope=BotCommandScopeChat(chat_id=ADMIN_GROUP_ID)
     )

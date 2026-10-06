@@ -1,22 +1,40 @@
 # handlers/start.py
 
 from aiogram import Router
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
 from utils.logger import get_logger
+from utils.config import MEDPHYSPRO_CHANNEL_USERNAME
 
 logger = get_logger("start")
 router = Router()
 
 @router.message(CommandStart())
 async def handle_start(message: Message):
-    await message.answer(
-        """👋 Теперь отправьте ваше сообщение.
-Бот перешлёт его всем администраторам.
+    channel_user = (MEDPHYSPRO_CHANNEL_USERNAME or "MedPhysProChannel").lstrip("@")
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📢 Наш канал",
+                    url=f"https://t.me/{channel_user}"
+                )
+            ]
+        ]
+    )
 
-⚠️ Внимание!
-Telegram работает нестабильно.
-Если вам не ответили, пожалуйста,
-попытайтесь отправить сообщение позже."""
+    await message.answer(
+        "👋 <b>Добро пожаловать в бот обратной связи MedPhys!</b>\n\n"
+        "Здесь вы можете связаться с администрацией проекта:\n"
+        "• Задать вопрос или предложить тему;\n"
+        "• Отправить материалы, новости или статьи;\n"
+        "• Прислать файлы любого формата (документы, PDF, фото, видео, архивы).\n\n"
+        "✉️ <i>Просто напишите ваше сообщение прямо в этот чат. "
+        "Дежурный администратор получит его и ответит вам здесь же.</i>\n\n"
+        "ℹ️ Если вы захотите изменить отправленное сообщение, просто отредактируйте его — "
+        "правка мгновенно отобразится у администраторов.",
+        reply_markup=keyboard,
+        parse_mode="HTML"
     )
     logger.info(f"[START] Обрабатываю /start от {message.from_user.id}")
+

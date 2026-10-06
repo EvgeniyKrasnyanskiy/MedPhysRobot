@@ -180,3 +180,46 @@ def test_extract_user_id_from_reply_bot_protection(monkeypatch):
     
     # Must NOT return bot.id
     assert extract_user_id_from_reply(msg) is None
+
+
+@pytest.mark.asyncio
+async def test_cmd_send_to_pro_group_without_reply(monkeypatch):
+    from handlers.moderation import cmd_send_to_pro_group
+    from utils.config import ADMIN_GROUP_ID
+
+    msg = MagicMock(spec=Message, chat=MagicMock(id=ADMIN_GROUP_ID), reply_to_message=None)
+    reply_mock = AsyncMock()
+    msg.reply = reply_mock
+    msg.delete = AsyncMock()
+
+    info_mock = MagicMock()
+    info_mock.delete = AsyncMock()
+    reply_mock.return_value = info_mock
+
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+
+    await cmd_send_to_pro_group(msg)
+    msg.reply.assert_called_once()
+    assert "/pro" in msg.reply.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_cmd_send_to_channel_without_reply(monkeypatch):
+    from handlers.moderation import cmd_send_to_channel
+    from utils.config import ADMIN_GROUP_ID
+
+    msg = MagicMock(spec=Message, chat=MagicMock(id=ADMIN_GROUP_ID), reply_to_message=None)
+    reply_mock = AsyncMock()
+    msg.reply = reply_mock
+    msg.delete = AsyncMock()
+
+    info_mock = MagicMock()
+    info_mock.delete = AsyncMock()
+    reply_mock.return_value = info_mock
+
+    monkeypatch.setattr("asyncio.sleep", AsyncMock())
+
+    await cmd_send_to_channel(msg)
+    msg.reply.assert_called_once()
+    assert "/channel" in msg.reply.call_args[0][0]
+

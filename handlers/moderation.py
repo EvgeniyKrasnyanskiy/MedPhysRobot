@@ -275,62 +275,131 @@ async def cmd_send_to_pro_group(message: Message):
         return
 
     logger.info(f"[MOD] cmd_send_to_pro_group вызван: from_msg_id={message.reply_to_message.message_id}, by={message.from_user.id}")
-    await send_to_pro_group(message)
+
+    text_or_caption = message.text or message.caption or ""
+    parts = text_or_caption.split(maxsplit=1)
+    args = parts[1].strip() if len(parts) > 1 else ""
+
+    await send_to_pro_group(message, args)
 
 
-async def send_to_pro_group(message: Message):
-    try:
-        # Добавлено: Определяем thread_id по ключевым словам, как в новостях
-        tid = resolve_topic_id_by_keywords(message.reply_to_message)
-        if tid is None and MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0:
-            tid = MEDPHYSPRO_GROUP_TOPIC_ID  # Fallback на дефолтный, если ключевых слов нет
-        suffix = ""  # Или другой, если нужно
-        logger.info(f"[MOD] send_to_pro_group: tid={tid}, suffix='{suffix}', reply_type={message.reply_to_message.content_type}")
+async def send_to_pro_group(message: Message, args: str = ""):
+    target_message_id = extract_message_id_from_link(args)
 
-        sent_messages = await send_content_to_group(
-            message=message.reply_to_message,
-            bot=message.bot,
-            chat_id=MEDPHYSPRO_GROUP_ID,
-            thread_id=tid,
-            suffix=suffix
-        )
+    if target_message_id is not None:
+        # Режим редактирования существующего сообщения в PRO-группе
+        try:
+            logger.info(f"[MOD] Попытка редактирования сообщения в PRO-группе: msg_id={target_message_id}, by={message.from_user.id}")
 
-        if not sent_messages:
-            logger.warning("[MOD] Не удалось переслать через send_content, fallback на copy")
-            copied = await message.bot.copy_message(
-                chat_id=MEDPHYSPRO_GROUP_ID,
-                from_chat_id=message.reply_to_message.chat.id,
-                message_id=message.reply_to_message.message_id,
-                message_thread_id=tid
+            reply = message.reply_to_message
+            has_media = bool(
+                reply.photo or
+                reply.video or
+                reply.document or
+                reply.audio or
+                reply.animation
             )
-            sent_messages = [copied]
 
-        ids_str = ", ".join(str(m.message_id) for m in sent_messages)
-        logger.info(
-            f"[MOD] Переслано в PRO-группу: from_msg_id={message.reply_to_message.message_id}, "
-            f"to_msg_ids=[{ids_str}], by={message.from_user.id}, thread_id={tid}, suffix='{suffix}'"
-        )
+            new_text = reply.html_text or ""
 
-        await message.bot.send_message(
-            chat_id=LOG_CHANNEL_ID,
-            text=(
-                f"📤 <b>Переслано из админской группы в PRO-группу</b>\n"
-                f"🧵 thread_id: <code>{tid}</code>\n"
-                f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
-                f"📨 Новые msg_id: <code>{ids_str}</code>\n"
-                f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
-            ),
-            parse_mode="HTML"
-        )
+            if has_media:
+                await message.bot.edit_message_caption(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    message_id=target_message_id,
+                    caption=new_text,
+                    parse_mode="HTML"
+                )
+            else:
+                await message.bot.edit_message_text(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    message_id=target_message_id,
+                    text=new_text,
+                    parse_mode="HTML"
+                )
 
-        await message.reply("✅ Сообщение отправлено в PRO-группу")
+            clean_id = str(MEDPHYSPRO_GROUP_ID)
+            if clean_id.startswith("-100"):
+                clean_id = clean_id[4:]
+            elif clean_id.startswith("-"):
+                clean_id = clean_id[1:]
+            post_link = f"https://t.me/c/{clean_id}/{target_message_id}"
 
-    except TelegramBadRequest as e:
-        logger.error(f"[MOD] Ошибка: {e}")
-        await message.reply(f"❌ Ошибка при пересылке: {e.message}")
-    except Exception as e:
-        logger.error(f"[MOD] Неизвестная ошибка: {e}")
-        await message.reply("❌ Неизвестная ошибка.")
+            await message.bot.send_message(
+                chat_id=LOG_CHANNEL_ID,
+                text=(
+                    f"📝 <b>Отредактировано сообщение в PRO-группе</b>\n"
+                    f"↪️ Исходное msg_id (реплай): <code>{message.reply_to_message.message_id}</code>\n"
+                    f"✏️ Сообщение в группе: <a href=\"{post_link}\">ID {target_message_id}</a>\n"
+                    f"👤 Редактор: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
+                ),
+                parse_mode="HTML"
+            )
+
+            await message.reply("✅ Сообщение в PRO-группе успешно отредактировано")
+
+        except TelegramBadRequest as e:
+            logger.error(f"[MOD] Ошибка редактирования в PRO-группе: {e}")
+            await message.reply(
+                f"❌ Не удалось отредактировать сообщение в группе: {e.message}\n"
+                f"Убедитесь, что сообщение было отправлено этим ботом и оно не слишком старое."
+            )
+        except Exception as e:
+            logger.error(f"[MOD] Неизвестная ошибка при редактировании в группе: {e}")
+            await message.reply("❌ Неизвестная ошибка при редактировании сообщения.")
+
+    else:
+        # Стандартный режим отправки нового сообщения в PRO-группу
+        try:
+            tid = resolve_topic_id_by_keywords(message.reply_to_message)
+            if tid is None and MEDPHYSPRO_GROUP_TOPIC_ID and int(MEDPHYSPRO_GROUP_TOPIC_ID) > 0:
+                tid = MEDPHYSPRO_GROUP_TOPIC_ID
+            suffix = ""
+            logger.info(f"[MOD] send_to_pro_group: tid={tid}, suffix='{suffix}', reply_type={message.reply_to_message.content_type}")
+
+            sent_messages = await send_content_to_group(
+                message=message.reply_to_message,
+                bot=message.bot,
+                chat_id=MEDPHYSPRO_GROUP_ID,
+                thread_id=tid,
+                suffix=suffix
+            )
+
+            if not sent_messages:
+                logger.warning("[MOD] Не удалось переслать через send_content, fallback на copy")
+                copied = await message.bot.copy_message(
+                    chat_id=MEDPHYSPRO_GROUP_ID,
+                    from_chat_id=message.reply_to_message.chat.id,
+                    message_id=message.reply_to_message.message_id,
+                    message_thread_id=tid
+                )
+                sent_messages = [copied]
+
+            ids_str = ", ".join(str(m.message_id) for m in sent_messages)
+            logger.info(
+                f"[MOD] Переслано в PRO-группу: from_msg_id={message.reply_to_message.message_id}, "
+                f"to_msg_ids=[{ids_str}], by={message.from_user.id}, thread_id={tid}, suffix='{suffix}'"
+            )
+
+            await message.bot.send_message(
+                chat_id=LOG_CHANNEL_ID,
+                text=(
+                    f"📤 <b>Переслано из админской группы в PRO-группу</b>\n"
+                    f"🧵 thread_id: <code>{tid}</code>\n"
+                    f"↪️ Исходное msg_id: <code>{message.reply_to_message.message_id}</code>\n"
+                    f"📨 Новые msg_id: <code>{ids_str}</code>\n"
+                    f"👤 Отправитель: <a href=\"tg://user?id={message.from_user.id}\">{html.escape(message.from_user.full_name)}</a>"
+                ),
+                parse_mode="HTML"
+            )
+
+            await message.reply("✅ Сообщение отправлено в PRO-группу")
+
+        except TelegramBadRequest as e:
+            logger.error(f"[MOD] Ошибка: {e}")
+            await message.reply(f"❌ Ошибка при пересылке: {e.message}")
+        except Exception as e:
+            logger.error(f"[MOD] Неизвестная ошибка: {e}")
+            await message.reply("❌ Неизвестная ошибка.")
 
 
 # 📢 /send_to_channel или /channel

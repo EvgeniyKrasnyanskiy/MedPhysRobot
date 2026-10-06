@@ -223,3 +223,36 @@ async def test_cmd_send_to_channel_without_reply(monkeypatch):
     msg.reply.assert_called_once()
     assert "/channel" in msg.reply.call_args[0][0]
 
+
+@pytest.mark.asyncio
+async def test_send_to_pro_group_edit_text_success():
+    from handlers.moderation import send_to_pro_group
+    
+    bot = AsyncMock(spec=Bot)
+    
+    reply_message = MagicMock(spec=Message, message_id=555)
+    reply_message.photo = None
+    reply_message.video = None
+    reply_message.document = None
+    reply_message.audio = None
+    reply_message.animation = None
+    reply_message.html_text = "<b>Updated Group Text</b>"
+    
+    message = MagicMock(spec=Message)
+    message.reply_to_message = reply_message
+    message.bot = bot
+    message.from_user = User(id=123, is_bot=False, first_name="Admin", full_name="Super Admin")
+    message.reply = AsyncMock()
+    
+    await send_to_pro_group(message, "https://t.me/c/1234567890/40322")
+    
+    bot.edit_message_text.assert_called_once()
+    kwargs = bot.edit_message_text.call_args[1]
+    assert kwargs["message_id"] == 40322
+    assert kwargs["text"] == "<b>Updated Group Text</b>"
+    assert kwargs["parse_mode"] == "HTML"
+    
+    message.reply.assert_called_once()
+    assert "✅ Сообщение в PRO-группе успешно отредактировано" in message.reply.call_args[0][0]
+
+
